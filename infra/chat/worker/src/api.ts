@@ -31,6 +31,27 @@ function isAuthorized(request: Request, env: Env): boolean {
   return scheme === "Bearer" && token === env.API_TOKEN;
 }
 
+/** Read conversation for a bot from a single KV key. */
+async function readConversation(
+  env: Env,
+  bot: string,
+): Promise<ChatMessage[]> {
+  const raw = await env.BOTFLEET_CHAT.get(`conv:${bot}`);
+  if (!raw) return [];
+  return JSON.parse(raw) as ChatMessage[];
+}
+
+/** Write conversation for a bot to a single KV key. */
+async function writeConversation(
+  env: Env,
+  bot: string,
+  messages: ChatMessage[],
+): Promise<void> {
+  await env.BOTFLEET_CHAT.put(`conv:${bot}`, JSON.stringify(messages), {
+    expirationTtl: TTL_30_DAYS,
+  });
+}
+
 export async function handleApiRequest(
   request: Request,
   url: URL,
@@ -52,21 +73,11 @@ export async function handleApiRequest(
       if (!bot) return json({ error: "Missing 'bot' query parameter" }, 400);
 
       const since = url.searchParams.get("since") || "";
+      const conversation = await readConversation(env, bot);
+      const messages = conversation.filter(
+        (m) => m.from === "human" && (!since || m.timestamp > since),
+      );
 
-      const list = await env.BOTFLEET_CHAT.list({ prefix: `msg:${bot}:` });
-      const messages: ChatMessage[] = [];
-
-      for (const key of list.keys) {
-        const value = await env.BOTFLEET_CHAT.get(key.name);
-        if (value) {
-          const msg: ChatMessage = JSON.parse(value);
-          if (!since || msg.timestamp > since) {
-            messages.push(msg);
-          }
-        }
-      }
-
-      messages.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
       return json({ messages });
     }
 
@@ -76,10 +87,16 @@ export async function handleApiRequest(
       const middle = pathname.slice("/api/inbox/".length, -"/reply".length);
       const msgId = decodeURIComponent(middle);
 
-      const original = await env.BOTFLEET_CHAT.get(msgId);
-      if (!original) return json({ error: "Original message not found" }, 404);
+      // Extract bot name from msgId (format: msg:<bot>:<timestamp>)
+      const parts = msgId.split(":");
+      if (parts.length < 3)
+        return json({ error: "Invalid message ID format" }, 400);
+      const bot = parts[1];
 
-      const originalMsg: ChatMessage = JSON.parse(original);
+      const conversation = await readConversation(env, bot);
+      const original = conversation.find((m) => m.id === msgId);
+      if (!original)
+        return json({ error: "Original message not found" }, 404);
 
       let body: string;
       try {
@@ -91,9 +108,7 @@ export async function handleApiRequest(
       if (!body) return json({ error: "Missing 'body' in request" }, 400);
 
       const now = Date.now();
-      const bot = originalMsg.to;
-      // Key: reply:<bot>:<original-timestamp>:<reply-timestamp>
-      const originalTs = originalMsg.id.split(":")[2];
+      const originalTs = msgId.split(":")[2];
       const replyId = `reply:${bot}:${originalTs}:${now}`;
 
       const reply: ChatMessage = {
@@ -105,9 +120,8 @@ export async function handleApiRequest(
         replyTo: msgId,
       };
 
-      await env.BOTFLEET_CHAT.put(replyId, JSON.stringify(reply), {
-        expirationTtl: TTL_30_DAYS,
-      });
+      conversation.push(reply);
+      await writeConversation(env, bot, conversation);
 
       return json(reply, 201);
     }
@@ -123,20 +137,7 @@ export async function handleApiRequest(
     const bot = url.searchParams.get("bot");
     if (!bot) return json({ error: "Missing 'bot' query parameter" }, 400);
 
-    // Fetch both directions: human→bot and bot→human
-    const [sentList, replyList] = await Promise.all([
-      env.BOTFLEET_CHAT.list({ prefix: `msg:${bot}:` }),
-      env.BOTFLEET_CHAT.list({ prefix: `reply:${bot}:` }),
-    ]);
-
-    const messages: ChatMessage[] = [];
-
-    for (const key of [...sentList.keys, ...replyList.keys]) {
-      const value = await env.BOTFLEET_CHAT.get(key.name);
-      if (value) messages.push(JSON.parse(value));
-    }
-
-    messages.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const messages = await readConversation(env, bot);
     return json({ messages });
   }
 
@@ -168,9 +169,9 @@ export async function handleApiRequest(
         timestamp: new Date(now).toISOString(),
       };
 
-      await env.BOTFLEET_CHAT.put(id, JSON.stringify(msg), {
-        expirationTtl: TTL_30_DAYS,
-      });
+      const conversation = await readConversation(env, bot);
+      conversation.push(msg);
+      await writeConversation(env, bot, conversation);
 
       sent.push(msg);
     }
