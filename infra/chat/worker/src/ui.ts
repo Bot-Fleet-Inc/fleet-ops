@@ -192,16 +192,7 @@ const HTML = `<!DOCTYPE html>
 
 <script>
   var BOTS = [
-    "dispatch-bot",
-    "archi-bot",
-    "audit-bot",
-    "coding-bot",
-    "project-mgmt-bot",
-    "devops-proxmox-bot",
-    "devops-cloudflare-bot",
-    "unifi-network-bot",
-    "crm-bot",
-    "design-bot"
+    "dispatch-bot"
   ];
 
   var selectedBot = null;

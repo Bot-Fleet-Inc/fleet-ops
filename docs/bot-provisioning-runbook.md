@@ -265,7 +265,25 @@ Follow `docs/deployment-runbook.md` Steps 2–8:
 6. Start bot service
 7. Verify deployment
 
-### Step 3.6: Verify End-to-End
+### Step 3.6: Enable Chat Channel
+
+Add the new bot to the Chat Worker sidebar and inject chat credentials into the bot's env file.
+
+1. **Add bot to UI sidebar** — edit `infra/chat/worker/src/ui.ts`, add `"<bot-name>"` to the `BOTS` array
+2. **Deploy the worker** — `cd infra/chat/worker && npx wrangler deploy`
+3. **Add chat credentials to bot env file** on the VM:
+   ```bash
+   # Append to /opt/bot/secrets/<bot-name>.env:
+   CHAT_WORKER_TOKEN=<value from 1Password: "Cloudflare Bearer Token — Botfleet Chat Worker">
+   CHAT_WORKER_URL=https://chat.bot-fleet.org
+   CF_ACCESS_CLIENT_ID=<value from 1Password: "Cloudflare Service Token — Bot Fleet API">
+   CF_ACCESS_CLIENT_SECRET=<value from 1Password: "Cloudflare Service Token — Bot Fleet API">
+   ```
+4. **Verify** — send a test message from `chat.bot-fleet.org` and confirm the bot can poll its inbox
+
+> **Note**: The Access service token (`Bot Fleet API`) is shared across all bots. The Chat Worker bearer token is also shared. Individual bot identity is determined by the `?bot=<name>` parameter in the poll URL.
+
+### Step 3.7: Verify End-to-End
 
 ```bash
 # Check service is running
