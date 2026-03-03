@@ -132,6 +132,14 @@ const HTML = `<!DOCTYPE html>
       color: #aaa;
       font-size: 14px;
     }
+    .error-banner {
+      padding: 10px 16px;
+      background: #fef2f2;
+      color: #b91c1c;
+      border-bottom: 1px solid #fecaca;
+      font-size: 13px;
+      display: none;
+    }
 
     /* ── Input area ── */
     .input-area {
@@ -178,6 +186,7 @@ const HTML = `<!DOCTYPE html>
     <div class="bot-list" id="bot-list"></div>
   </div>
   <div class="main">
+    <div class="error-banner" id="error-banner"></div>
     <div class="chat-header" id="chat-header">
       Select a bot to start chatting
     </div>
@@ -192,7 +201,16 @@ const HTML = `<!DOCTYPE html>
 
 <script>
   var BOTS = [
-    "dispatch-bot"
+    "dispatch-bot",
+    "archi-bot",
+    "audit-bot",
+    "coding-bot",
+    "project-mgmt-bot",
+    "devops-proxmox-bot",
+    "devops-cloudflare-bot",
+    "unifi-network-bot",
+    "crm-bot",
+    "design-bot"
   ];
 
   var selectedBot = null;
@@ -288,7 +306,14 @@ const HTML = `<!DOCTYPE html>
 
         if (wasAtBottom) container.scrollTop = container.scrollHeight;
       })
-      .catch(function(err) { console.error("Failed to load messages:", err); });
+      .catch(function(err) { showError("Failed to load messages: " + err.message); });
+  }
+
+  function showError(msg) {
+    var banner = document.getElementById("error-banner");
+    banner.textContent = msg;
+    banner.style.display = "block";
+    setTimeout(function() { banner.style.display = "none"; }, 8000);
   }
 
   // ── Send message ──
@@ -317,9 +342,13 @@ const HTML = `<!DOCTYPE html>
         } else {
           loadMessages();
         }
+      } else {
+        res.text().then(function(text) {
+          showError("Failed to send message: " + res.status + " " + text);
+        });
       }
     })
-    .catch(function(err) { console.error("Failed to send:", err); })
+    .catch(function(err) { showError("Network error: " + err.message); })
     .then(function() { btn.disabled = false; });
   }
 
