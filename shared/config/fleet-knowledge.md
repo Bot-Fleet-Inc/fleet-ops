@@ -31,6 +31,7 @@ Curated facts all bots should know. Updated by any bot when fleet-level knowledg
 | unifi-network-bot | botfleet-unifi | unifi@bot-fleet.org | 422 | 172.16.10.32 | VLANs, firewall, switch config | Infra-Access |
 | crm-bot | botfleet-crm | crm@bot-fleet.org | 423 | 172.16.10.33 | Customer relations, support | DMZ |
 | design-bot | botfleet-design | design@bot-fleet.org | 416 | 172.16.10.26 | Logo, brand guide, UI design | DMZ |
+| knowledge-bot | botfleet-knowledge | knowledge@bot-fleet.org | 417 | 172.16.10.27 | Knowledge curation, reporting, vault grooming | DMZ |
 
 ## Infrastructure Topology
 
@@ -51,7 +52,7 @@ Curated facts all bots should know. Updated by any bot when fleet-level knowledg
 ## Coordination Protocol
 
 - **Primary channel**: GitHub Issues — all work is tracked as issues
-- **Bot labels**: `bot:dispatch`, `bot:archi`, `bot:audit`, `bot:coding`, `bot:pm`, `bot:devproxmox`, `bot:devcloudflare`, `bot:unifi`, `bot:crm`, `bot:design`
+- **Bot labels**: `bot:dispatch`, `bot:archi`, `bot:audit`, `bot:coding`, `bot:pm`, `bot:devproxmox`, `bot:devcloudflare`, `bot:unifi`, `bot:crm`, `bot:design`, `bot:knowledge`
 - **Priority labels**: `priority:critical`, `priority:high`, `priority:medium`, `priority:low`
 - **Status labels**: `status:in-progress`, `status:blocked`, `status:needs-human`
 - **Issue flow**: dispatch-bot detects events and creates issues → triages → assigns to specialist bot → bot processes → closes
