@@ -9,7 +9,7 @@ Canonical specification for bot workspace structure. Every bot in the fleet foll
 
 ## Overview
 
-Each bot has a workspace directory at `bots/<bot-name>/` in the shared repo. The workspace contains all files the bot needs to operate: identity, personality, operational config, tools, memory, and Claude Code instructions.
+Each bot has a workspace directory at `bots/<bot-name>/` in the shared repo. The workspace contains all files the bot needs to operate: identity, personality, operational config, tools, memory, and agent instructions.
 
 On the VM, the repo is cloned to `/opt/bot/workspace/fleet-ops/`. Secrets are stored separately at `/opt/bot/secrets/<bot-name>.env`.
 
@@ -26,7 +26,7 @@ bots/<bot-name>/
 ├── MEMORY.md            # Long-term synthesized knowledge (~200 lines max)
 ├── README.md            # Deployment runbook and troubleshooting
 ├── .claude/
-│   ├── CLAUDE.md        # Claude Code project instructions + startup sequence
+│   ├── CLAUDE.md        # Agent instructions (legacy — OpenClaw reads openclaw.json)
 │   └── settings.json    # Tool permissions per security tier
 ├── memory/
 │   ├── YYYY-MM-DD.md    # Daily log files (~500 lines max)
@@ -99,7 +99,7 @@ Organisation and domain knowledge. Sections:
 
 Available tools and how to use them. Standard tools available to all bots:
 - `gh` CLI (GitHub Issues, PRs, labels)
-- Claude Code CLI (complex reasoning, file editing)
+- OpenClaw agent runtime (model-agnostic, 4-tier LLM routing)
 - Local LLM (http://172.16.11.10:8000, classification/summarization)
 
 Bot-specific tools are listed per bot (e.g., Proxmox API for devops-proxmox-bot).
@@ -128,7 +128,7 @@ Curated daily at 02:00 UTC from daily log entries.
 
 ### .claude/CLAUDE.md
 
-Claude Code project instructions that define the session startup sequence:
+Legacy agent instructions (OpenClaw reads `.openclaw/openclaw.json` instead). Defines the session startup sequence:
 1. Read SOUL.md → IDENTITY.md → CONTEXT.md → AGENTS.md → TOOLS.md → HEARTBEAT.md
 2. Read MEMORY.md → latest daily log
 3. Begin main issue processing loop

@@ -47,7 +47,7 @@ Cloud-Init has no include or inheritance mechanism. Each template is self-contai
 | Template | VMIDs | VMs | Key Packages | Resources |
 |----------|-------|-----|-------------|-----------|
 | `cloudflare-tunnel.yaml` | 400 | 1 | cloudflared | 1 vCPU / 2 GB / 32 GB |
-| `bot-standard.yaml` | 411-413, 415, 421, 423 | 6 | Node.js 20, Python 3, Claude Code, gh | 2 vCPU / 4 GB / 64 GB |
+| `bot-standard.yaml` | 411-413, 415, 421, 423 | 6 | Node.js 20, Python 3, OpenClaw, gh | 2 vCPU / 4 GB / 64 GB |
 | `bot-coding.yaml` | 414 | 1 | Standard + Docker, build-essential, TypeScript | 4 vCPU / 8 GB / 128 GB |
 | `bot-infra.yaml` | 420, 422 | 2 | Standard + Ansible, Terraform, proxmoxer | 2 vCPU / 4 GB / 64 GB |
 | `llm-inference.yaml` | 450 | 1 | nvidia-driver-550, vLLM, Ollama | 8 vCPU / 32 GB / 256 GB + A10 |
@@ -61,8 +61,8 @@ Cloud-Init has no include or inheritance mechanism. Each template is self-contai
 ### 1. No Docker on standard/infra bots
 Only the coding bot gets Docker. Standard bots are lightweight Python/Node.js agents — Docker adds unnecessary attack surface on 2 vCPU / 4 GB VMs.
 
-### 2. Claude Code installation
-Installed via `npm install -g @anthropic-ai/claude-code` after Node.js 20 LTS setup. Present in bot-standard, bot-coding, and bot-infra. NOT in tunnel or LLM templates. API key is injected post-deploy (never in Cloud-Init).
+### 2. OpenClaw installation
+Installed via `npm install -g openclaw` after Node.js 20 LTS setup. Present in bot-standard, bot-coding, and bot-infra. NOT in tunnel or LLM templates. API keys are injected post-deploy (never in Cloud-Init).
 
 ### 3. Security hardening
 UFW + fail2ban on all templates (defense-in-depth alongside UniFi firewall). UFW rules are tailored per role:
@@ -116,7 +116,7 @@ Packages duplicated across multiple templates:
 
 ### Bot runcmd (3/5: standard, coding, infra)
 - Node.js 20 LTS (nodesource)
-- `@anthropic-ai/claude-code` (npm global)
+- `openclaw` (npm global)
 - `gh` GitHub CLI (official apt repo)
 - `PyGithub`, `requests` (pip)
 - `virtualenv`, `poetry` (pip)
@@ -137,10 +137,10 @@ Packages duplicated across multiple templates:
 
 ### `bot-standard.yaml` (VMIDs 411-413, 415, 421, 423)
 
-**Purpose**: Core bot runtime for Python/Node.js agents with Claude Code.
+**Purpose**: Core bot runtime for Python/Node.js agents with OpenClaw.
 
 - **Unique features**: `/opt/bot/workspace/`, `/var/log/bot/`
-- **runcmd**: Node.js 20, Claude Code, poetry, gh CLI, PyGithub
+- **runcmd**: Node.js 20, OpenClaw, poetry, gh CLI, PyGithub
 - **Ports**: SSH only
 
 ### `bot-coding.yaml` (VMID 414)
@@ -166,7 +166,7 @@ Packages duplicated across multiple templates:
 
 **Purpose**: GPU inference server — completely different from bot templates.
 
-- **No**: Node.js, Claude Code, GitHub CLI, Docker, prometheus-node-exporter
+- **No**: Node.js, OpenClaw, GitHub CLI, Docker, prometheus-node-exporter
 - **Unique packages**: `nvidia-driver-550-server`, `nvidia-utils-550-server`
 - **runcmd**: Creates `llm` user, Python venv with vLLM, installs Ollama
 - **Services**: `vllm.service` (disabled until model loaded), Ollama with `OLLAMA_HOST=0.0.0.0:11434`

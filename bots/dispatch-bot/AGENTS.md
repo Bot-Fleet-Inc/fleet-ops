@@ -82,7 +82,7 @@ Every 60 seconds:
 
 ### Context Recovery
 
-When the Claude Code context window compresses (messages are summarised):
+When the context window compresses (messages are summarised):
 
 1. **Don't panic** — this is expected during long-running sessions
 2. Read `bots/dispatch-bot/MEMORY.md` — curated long-term facts

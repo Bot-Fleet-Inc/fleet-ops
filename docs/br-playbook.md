@@ -110,8 +110,8 @@ Follow the standard deployment runbook with the bot's customised workspace files
 
 ### Checklist
 
-- [ ] Claude Max subscription active for bot's Google account
-- [ ] `claude setup-token` authenticated on VM
+- [ ] API keys provisioned (Gemini per-bot, Anthropic shared, OpenClaw hook token)
+- [ ] OpenClaw installed and config verified on VM
 - [ ] Workspace files committed and pushed to fleet-ops
 - [ ] Secrets injected to `/opt/bot/secrets/<bot-name>.env`
 - [ ] gh CLI authenticated
@@ -189,9 +189,9 @@ Jorgen reviews the bot's first week of operation:
 
 ### dispatch-bot (2026-03-03) — First Onboarding
 
-- **Blocker**: Claude Code CLI requires subscription auth (`claude auth login`), not just `ANTHROPIC_API_KEY` — discovered after deployment, resolved with Claude Max subscription model
-- **Decision**: Adopt OpenClaw workspace patterns (8-file structure, dual memory, heartbeats) without platform dependency
-- **Decision**: Claude Max ($100/mo per bot) as auth model — setup token per VM
+- **Blocker (resolved)**: Originally used Claude Code CLI which required $100/mo Claude Max subscription per bot — migrated to OpenClaw with 4-tier LLM routing
+- **Decision**: Adopt OpenClaw as model-agnostic runtime (ADR-003) — 4-tier routing reduces per-bot cost to near-zero (Gemini free tier for most tasks)
+- **Decision**: API key model (shared Anthropic key + per-bot Gemini key) replaces per-bot subscription
 - **Observation**: Workspace files need more personality depth than templates provide — interview process is essential
 - **Process**: Added "Dialogue and Judgement" section to SOUL.md during onboarding — this section is as important as Principles and Boundaries for manager-tier bots
 

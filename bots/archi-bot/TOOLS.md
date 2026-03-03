@@ -10,11 +10,17 @@ GitHub CLI for issue management.
 - `gh issue close` — close completed issues
 - `gh pr create` — create pull requests for model changes
 
-### Claude Code CLI
-Complex reasoning and file editing.
-- Multi-step architecture analysis
-- ArchiMate XML editing
-- Viewpoint documentation generation
+### OpenClaw Runtime
+Model-agnostic agent runtime. Selects the right model per task complexity.
+
+| Task Complexity | Model | Provider |
+|-----------------|-------|----------|
+| Low (classify, label, summarize) | Local LLM | Ollama (A10 GPU) |
+| Medium (triage, dispatch, chat) | Gemini 2.5 Flash | Google (free tier) |
+| High (multi-domain analysis) | Claude Sonnet | Anthropic API |
+| Critical (escalation reasoning) | Claude Opus | Anthropic API |
+
+Config: `.openclaw/openclaw.json` — exec tool allowlist: `gh`, `git`, `curl`
 
 ### Local LLM
 Quick classification tasks via http://172.16.11.10:8000

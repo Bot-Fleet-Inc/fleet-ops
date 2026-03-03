@@ -15,8 +15,8 @@ Before deploying a bot, ensure:
 - [ ] VM has network connectivity on VLAN 1010 (test with `ping 172.16.10.1`)
 - [ ] GitHub machine user account created via Google OAuth (see `docs/bot-provisioning-runbook.md`)
 - [ ] Classic PAT generated with `repo` + `read:org` scopes
-- [ ] **Claude Max subscription** active for the bot's Google account (see Step 4b below)
-- [ ] Claude Code CLI authenticated via `claude setup-token` on the VM
+- [ ] OpenClaw installed on the VM (`npm install -g openclaw`)
+- [ ] OpenClaw config verified (`.openclaw/openclaw.json` in bot workspace)
 - [ ] Both tokens stored in 1Password vault "Bot Fleet Vault"
 - [ ] Bot workspace files exist in `bots/<bot-name>/` in the repo
 
@@ -134,45 +134,36 @@ chown bot:bot /opt/bot/secrets/<bot-name>.env
 
 > **1Password item names**: GitHub PATs are per-bot (`GitHub PAT — archi-bot`, etc.). The Anthropic API key is shared across all bots (`Anthropic API Key — Botfleet`). See `docs/cloudflare-credentials.md` for the full naming convention.
 
-## Step 4b: Authenticate Claude Code CLI (Claude Max)
+## Step 4b: Verify OpenClaw Configuration
 
-Claude Code CLI requires subscription auth — `ANTHROPIC_API_KEY` alone is **not sufficient** for CLI sessions. Worse: if `ANTHROPIC_API_KEY` is set in the environment, Claude Code will use it instead of the subscription (incurring API charges). The env file must use `ANTHROPIC_INFERENCE_KEY` instead (see Step 4 above).
+OpenClaw uses API keys (not subscription auth) for LLM access. The 4-tier routing is configured in `.openclaw/openclaw.json`.
 
-### Subscribe to Claude Max
-
-If not already done (see `docs/bot-provisioning-runbook.md` Step 1.7):
-
-1. Log in to [claude.ai](https://claude.ai) as the bot's Google account (`<role>@bot-fleet.org`)
-2. Subscribe to **Claude Max** ($100/month)
-
-### Authenticate on the VM (headless OAuth)
-
-The CLI uses browser-based OAuth. On a headless VM, use SSH port forwarding:
+### Verify OpenClaw is installed
 
 ```bash
-# From your Mac — SSH to VM with port forwarding for OAuth callback
-ssh -L 8080:localhost:8080 admin@<ip-address>
-
-# On the VM, as the bot user:
-sudo -u bot /usr/bin/claude auth login --email <role>@bot-fleet.org
+sudo -u bot openclaw --version
 ```
 
-The CLI will display a localhost URL. Since port 8080 is forwarded, open that URL in your **local Mac browser**. Log in with the bot's Google account to complete OAuth.
-
-> **If port forwarding doesn't work**: Press `c` in the terminal to copy the OAuth URL, then paste it into your local browser. The CLI shows the URL it's waiting on.
-
-This creates `~/.claude/` auth config for the bot user. The existing systemd unit (`bot@.service`) will use this auth automatically.
-
-### Verify
+### Verify config exists
 
 ```bash
-sudo -u bot /usr/bin/claude auth status
-sudo -u bot /usr/bin/claude -p "Say hello" --model sonnet
+ls -la /opt/bot/workspace/fleet-ops/bots/<bot-name>/.openclaw/openclaw.json
 ```
 
-Expected: `auth status` shows the bot's email. The `-p` test returns a greeting. If it errors with a 403, verify the Claude Max subscription is active at [claude.ai/settings](https://claude.ai/settings).
+### Verify environment variables
 
-> **Critical**: Ensure `ANTHROPIC_API_KEY` is NOT set in the bot's environment. The env file should use `ANTHROPIC_INFERENCE_KEY` for the shared Anthropic key (used only by the local inference routing library). If `ANTHROPIC_API_KEY` exists, Claude Code ignores the subscription and charges the API key instead.
+The bot's env file (`/opt/bot/secrets/<bot-name>.env`) must contain:
+- `ANTHROPIC_API_KEY` — for Claude Sonnet/Opus escalation
+- `GEMINI_API_KEY` — for Gemini Flash (free tier, per-bot key)
+- `OPENCLAW_HOOK_TOKEN` — per-bot gateway auth token
+
+### Test OpenClaw gateway
+
+```bash
+sudo -u bot openclaw gateway health
+```
+
+Expected: healthy status. If it fails, verify API keys are set and the config file is valid JSON.
 
 ## Step 5: Authenticate gh CLI
 
@@ -319,7 +310,7 @@ Deploy bots in this order (dependency-based):
 
 | Symptom | Check | Fix |
 |---------|-------|-----|
-| Service won't start | `journalctl -u bot@<name> -n 50` | Check env file exists, claude CLI installed |
+| Service won't start | `journalctl -u bot@<name> -n 50` | Check env file exists, openclaw installed |
 | Bot not picking up issues | `gh issue list --assignee <user>` | Verify GITHUB_TOKEN, check query in AGENTS.md |
 | Can't reach GitHub API | `gh api rate_limit` | Check tunnel VM (400), verify DNS resolution |
 | Can't reach local LLM | `curl http://172.16.11.10:8000/health` | Check VLAN 1011 routing, LLM VM (450) status |

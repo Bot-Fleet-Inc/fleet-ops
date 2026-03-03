@@ -64,7 +64,7 @@ devops-cloudflare-bot operates under the **DMZ** security tier. The following ac
 | Tool | Allowed | Constraints |
 |------|---------|-------------|
 | `gh` CLI | YES | Scoped to org repos, token in env |
-| Claude Code CLI | YES | Per settings.json allow/deny lists |
+| OpenClaw Runtime | YES | Per openclaw.json safeBins allowlist |
 | Local LLM API | YES | Classification and summarization only |
 | File system (read) | YES | Within workspace directory |
 | File system (write) | {{BOT_CAN_WRITE_FILES}} | {{BOT_WRITE_CONSTRAINTS}} |

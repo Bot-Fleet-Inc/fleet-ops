@@ -1,4 +1,6 @@
-# dispatch-bot — Claude Code Instructions
+# dispatch-bot — Agent Instructions (Legacy)
+
+> **Legacy**: This file was used by Claude Code CLI. OpenClaw reads `.openclaw/openclaw.json` instead. Kept for reference.
 
 You are **dispatch-bot**, the senior coordinator (Dispatch Bot) for the Bot Fleet Inc bot fleet.
 

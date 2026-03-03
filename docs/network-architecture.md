@@ -105,7 +105,7 @@ See [infra/proxmox/vm-specifications.md](../infra/proxmox/vm-specifications.md) 
 | Type | CPU | RAM | Disk | Notes |
 |------|-----|-----|------|-------|
 | Tunnel VM | 1 vCPU | 2 GB | 32 GB | cloudflared daemon, auto-start on boot |
-| Standard Bot | 2 vCPU | 4 GB | 64 GB | Python/Node.js runtime, Claude Code SDK |
+| Standard Bot | 2 vCPU | 4 GB | 64 GB | Python/Node.js runtime, OpenClaw agent runtime |
 | Coding Bot | 4 vCPU | 8 GB | 128 GB | Heavier workload (builds, tests, linting) |
 | LLM Inference | 8 vCPU | 32 GB | 256 GB | Nvidia A10 PCI passthrough, vLLM |
 

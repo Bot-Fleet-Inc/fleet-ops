@@ -109,7 +109,7 @@ write_files:
       echo "=== Bot Runtime ==="
       node --version 2>/dev/null && echo "Node.js: $(node --version)" || echo "Node.js: not installed"
       python3 --version 2>/dev/null && echo "Python: $(python3 --version)" || echo "Python: not installed"
-      claude --version 2>/dev/null && echo "Claude Code: $(claude --version)" || echo "Claude Code: not installed"
+      openclaw --version 2>/dev/null && echo "OpenClaw: $(openclaw --version)" || echo "OpenClaw: not installed"
       docker --version 2>/dev/null && echo "Docker: $(docker --version)" || echo "Docker: not installed"
       echo ""
       echo "=== Services ==="
@@ -147,7 +147,7 @@ write_files:
       ## Runtime
       - Python 3 with pip, venv, poetry
       - Node.js 20 LTS with npm, TypeScript, ts-node
-      - Claude Code CLI (`claude`)
+      - OpenClaw agent runtime (`openclaw`)
       - GitHub CLI (`gh`)
       - Docker CE with Compose plugin
       - Build tools (gcc, cmake, pkg-config)
@@ -165,8 +165,8 @@ runcmd:
   - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   - apt-get install -y nodejs
 
-  # Install Claude Code CLI
-  - npm install -g @anthropic-ai/claude-code
+  # Install OpenClaw agent runtime
+  - npm install -g openclaw
 
   # Install TypeScript tooling
   - npm install -g typescript ts-node
