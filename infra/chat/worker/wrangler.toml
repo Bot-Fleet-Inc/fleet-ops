@@ -1,0 +1,17 @@
+name = "botfleet-chat"
+main = "src/index.ts"
+compatibility_date = "2025-02-14"
+account_id = "b7079628ac25013a2ea7c92db2c99224"
+
+# KV namespace — create with: npx wrangler kv namespace create BOTFLEET_CHAT
+# Then paste the namespace ID below.
+[[kv_namespaces]]
+binding = "BOTFLEET_CHAT"
+id = "f40dd32f6f9a47d5892531fbff26d26b"
+
+# Custom domain: chat.bot-fleet.org
+# Configure in Cloudflare Workers dashboard → Custom Domains
+# Or add CNAME: chat.bot-fleet.org → botfleet-chat.<account>.workers.dev
+#
+# Zero Trust Access: protect chat.bot-fleet.org with Google Workspace SSO.
+# Add a bypass policy for /api/inbox* so bots can reach it with bearer tokens.

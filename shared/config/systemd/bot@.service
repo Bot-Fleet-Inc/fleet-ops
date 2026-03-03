@@ -1,0 +1,33 @@
+[Unit]
+Description=Bot Fleet - %i
+After=network-online.target
+Wants=network-online.target
+Documentation=https://github.com/Bot-Fleet-Inc/fleet-ops
+
+[Service]
+Type=simple
+User=bot
+Group=bot
+WorkingDirectory=/opt/bot/workspace/fleet-ops
+EnvironmentFile=/opt/bot/secrets/%i.env
+ExecStart=/usr/local/bin/claude --yes --model sonnet \
+    --system-prompt "Read the following files in order and then begin your main loop: bots/%i/SOUL.md, bots/%i/IDENTITY.md, bots/%i/CONTEXT.md, bots/%i/AGENTS.md, bots/%i/TOOLS.md, bots/%i/HEARTBEAT.md, bots/%i/MEMORY.md. Then read the latest file in bots/%i/memory/ directory. Begin processing assigned GitHub issues."
+Restart=on-failure
+RestartSec=30
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/bot/workspace /opt/bot/secrets /var/log/bot
+ProtectHome=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bot-%i
+
+[Install]
+WantedBy=multi-user.target

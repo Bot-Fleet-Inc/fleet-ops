@@ -1,0 +1,13 @@
+[Unit]
+Description=Nightly bot workspace backup — %i
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=bot
+Group=bot
+WorkingDirectory=/opt/bot/workspace/fleet-ops
+ExecStart=/opt/bot/workspace/fleet-ops/shared/config/scripts/nightly-backup.sh %i
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bot-backup-%i

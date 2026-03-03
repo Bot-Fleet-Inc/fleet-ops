@@ -1,0 +1,13 @@
+name = "botfleet-email"
+main = "src/index.ts"
+compatibility_date = "2025-02-14"
+account_id = "b7079628ac25013a2ea7c92db2c99224"
+
+# KV namespace — create with: npx wrangler kv namespace create BOTFLEET_EMAIL
+# Then paste the binding ID below.
+[[kv_namespaces]]
+binding = "BOTFLEET_EMAIL"
+id = "c59aeeeeef714b30b983de5eef290b09"
+
+# Email routing — catch-all for *@bot-fleet.org
+# Configure in Cloudflare dashboard: Email Routing → Catch-all → Route to Worker

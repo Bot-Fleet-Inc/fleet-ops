@@ -1,0 +1,30 @@
+# Site Configuration — Vennelsborg Bot Fleet
+#
+# Used by vmfactory and deploy scripts to resolve site-specific
+# defaults when provisioning VMs.
+#
+# Reference: ecobyte-services/proxmox-cloudinit
+
+site:
+  name: "Vennelsborg Bot Fleet"
+  domain: "vennelsborg.local"
+  timezone: "Europe/Oslo"
+  locale: "en_US.UTF-8"
+
+network:
+  dns:
+    - "1.1.1.1"
+    - "8.8.8.8"
+  template_nics:
+    - bridge: "vnet-botfleet"
+
+storage:
+  snippets: "local"
+  vm_disks: "local-zfs"
+
+defaults:
+  template_id: 9000
+  pool: "botfleet"
+  cpu: 2
+  memory: 4096
+  disk: 64

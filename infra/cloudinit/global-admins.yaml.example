@@ -1,0 +1,48 @@
+#cloud-config
+# Global Admins — SSH keys and emergency access
+#
+# This file is merged with an application-specific template by the
+# proxmox-cloudinit deploy pipeline (two-file merge system).
+#
+# SSH keys:
+#   - admin: Mac Mini key + Proxmox root key + GitHub import for other devices
+#   - bot-operator: GitHub import for fleet automation (Jorbot, infra bots)
+#   - emergency: break-glass key stored in 1Password "Bot Fleet Vault" vault
+#
+# Usage:
+#   1. Copy to global-admins.yaml
+#   2. Verify SSH keys are current (especially break-glass key)
+#   3. Place in Proxmox snippets storage (nvmedata:snippets/)
+#
+# Reference: ecobyte-services/proxmox-cloudinit
+
+users:
+  - name: admin
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    no_user_group: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIACxzhcIUwA6KcvnAibKgq0rr6Jw/RaG1LYlaaIP9SYw jorgen@remoteproduction.no
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSYLOK3Xr7iLZtVH8zANHLipH8nEnJV5hE0fmHCVX1Kulz4JEZHkWrV2uF550bIcPDGjjkXw8yjQFY57DOkOmIsmHbmOrZjxuBlZGrwafTn/vcOUTvsJlhmS38/ZNbf+RiIA1Jrp0GZ/1mE9G8Wx3prchmvx1XZAz/ioy8TJPpMZb5BJLuV08cBN/EThhEx4a0zb6J9fI+WoUPzI7Hm+Sq6MH++GM3Bx5CpnvGYIe7fEQeBRQF/uXLaziH2HQ0cB3e0RpZG04jHk9HYHr9AOGqHKryFdAEfoZAtNZ4m4ABK3cJ7gS+Ks6oCkWrSp8HKIPHYa8V0IICwHuBZEH1D7ENA1ibEmCdKg42PsKIqDyowqtT6AE2jdJXKiUg64GUQ54OiWzjVZm4h4mtHzAHkf6RMiYvJu4gu7FgbfTXlJdDJ7BQY9ceLPDLf7RYN8hxU9GG0yjJlmSXjlNTmg+w/f7+oIwxY2WCFsDcvbYgZmFdf7kItmSpkQLWXykqAurYzWc+p/pZbWTpsdPhCGyRpSTiZVPcp6oRWwo5P0YhlMmOETYnPc/jW0j3tsX38gqOrLVNg3mbc9c7/9Y9YwWA3xcadJlxls/a9ZzkHEn+Hlyr7SL//ScRZCeb26fJgBDXUNn+9LIWf2ZkL+oStakBrBpPlzY1R+pSxJDq6kzcBSZdGw== root@proxmox
+    ssh_import_id:
+      - gh:jorgenscheel
+
+  - name: bot-operator
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_import_id:
+      - gh:jorgenscheel
+    comment: "Automated fleet management — used by Jorbot and infra bots for SSH access"
+
+  - name: emergency
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH1034LyyDPDLac9uHIBoJ/q+cqGzDo/jVN1B3F12bL5 breakglass@botfleet
+    comment: "Break-glass emergency access — key stored in 1Password Bot Fleet Vault vault"

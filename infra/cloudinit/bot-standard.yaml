@@ -1,0 +1,172 @@
+#cloud-config
+# Cloud-Init: Standard Bot VM
+#
+# Targets: VMIDs 410-413, 415, 421, 423
+#   410 — Change Management Bot (172.16.10.20)
+#   411 — Dispatch Bot (172.16.10.21)
+#   412 — Architecture Bot (172.16.10.22)
+#   413 — Audit Bot (172.16.10.23)
+#   415 — Project Management Bot (172.16.10.25)
+#   421 — DevOps Cloudflare Bot (172.16.10.31)
+#   423 — CRM Bot (172.16.10.33)
+# Resources: 2 vCPU / 4 GB RAM / 64 GB disk
+# VLAN: 1010
+# Purpose: Python/Node.js bot runtime with Claude Code CLI
+#
+# Merged with global-admins.yaml by deploy pipeline.
+# Post-deploy: connect 1Password service account for secret retrieval.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  # System utilities
+  - curl
+  - wget
+  - gnupg
+  - ca-certificates
+  - jq
+  - htop
+  - net-tools
+  - tmux
+  - vim
+  - nano
+  - git
+  - unzip
+  - rsync
+  - tree
+  # Python runtime
+  - python3
+  - python3-pip
+  - python3-venv
+  - python3-dev
+  # Security
+  - fail2ban
+  - ufw
+  - unattended-upgrades
+  # Infrastructure
+  - qemu-guest-agent
+  - prometheus-node-exporter
+  # Logging
+  - rsyslog
+  - logrotate
+  - sysstat
+
+write_files:
+  - path: /etc/ufw/applications.d/botfleet
+    content: |
+      [SSH]
+      title=OpenSSH Server
+      description=OpenSSH server
+      ports=22/tcp
+    permissions: "0644"
+
+  - path: /etc/fail2ban/jail.d/botfleet.conf
+    content: |
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 5
+      bantime = 3600
+      findtime = 600
+    permissions: "0644"
+
+  - path: /usr/local/bin/sysinfo
+    content: |
+      #!/bin/bash
+      echo "=== System Info ==="
+      echo "Hostname: $(hostname)"
+      echo "Uptime: $(uptime -p)"
+      echo "IP: $(hostname -I | awk '{print $1}')"
+      echo "Disk: $(df -h / | tail -1 | awk '{print $3 "/" $2 " (" $5 ")"}')"
+      echo "Memory: $(free -h | awk '/Mem:/{print $3 "/" $2}')"
+      echo ""
+      echo "=== Bot Runtime ==="
+      node --version 2>/dev/null && echo "Node.js: $(node --version)" || echo "Node.js: not installed"
+      python3 --version 2>/dev/null && echo "Python: $(python3 --version)" || echo "Python: not installed"
+      claude --version 2>/dev/null && echo "Claude Code: $(claude --version)" || echo "Claude Code: not installed"
+      echo ""
+      echo "=== Services ==="
+      systemctl is-active prometheus-node-exporter && echo "node-exporter: active" || echo "node-exporter: inactive"
+      systemctl is-active fail2ban && echo "fail2ban: active" || echo "fail2ban: inactive"
+    permissions: "0755"
+
+  - path: /etc/motd
+    content: |
+      ┌─────────────────────────────────────────┐
+      │  Vennelsborg Bot Fleet — Standard Bot    │
+      │  VLAN 1010 · Python / Node.js / Claude   │
+      │  Run `sysinfo` for system status         │
+      └─────────────────────────────────────────┘
+    permissions: "0644"
+
+  - path: /opt/bot/README.md
+    content: |
+      # Bot Workspace
+
+      This directory is the bot's working area.
+
+      ## Structure
+      - `/opt/bot/workspace/` — Git clones and active work
+      - `/var/log/bot/` — Bot-specific logs
+
+      ## Environment
+      Required environment variables (injected post-deploy):
+      - `ANTHROPIC_API_KEY` — Claude API access
+      - `GITHUB_TOKEN` — GitHub API access for issue coordination
+
+      ## Runtime
+      - Python 3 with pip, venv, poetry
+      - Node.js 20 LTS with npm
+      - Claude Code CLI (`claude`)
+      - GitHub CLI (`gh`)
+    permissions: "0644"
+
+runcmd:
+  # Install Node.js 20 LTS
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+
+  # Install Claude Code CLI
+  - npm install -g @anthropic-ai/claude-code
+
+  # Install Python dev tools
+  - pip3 install --break-system-packages virtualenv poetry
+
+  # Install GitHub CLI
+  - curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /usr/share/keyrings/githubcli-archive-keyring.gpg >/dev/null
+  - chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list
+  - apt-get update
+  - apt-get install -y gh
+
+  # Install 1Password CLI (op) for secret retrieval
+  - curl -sS https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | tee /etc/apt/sources.list.d/1password-cli.list
+  - mkdir -p /etc/debsig/policies/AC2D62742012EA22/
+  - curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol | tee /etc/debsig/policies/AC2D62742012EA22/1password.pol
+  - mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22
+  - curl -sS https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg
+  - apt-get update
+  - apt-get install -y 1password-cli
+
+  # Install Python libraries for bot coordination
+  - pip3 install --break-system-packages PyGithub requests
+
+  # Create bot workspace directories
+  - mkdir -p /opt/bot/workspace
+  - mkdir -p /var/log/bot
+
+  # Enable UFW — SSH only
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp comment "SSH"
+  - ufw --force enable
+
+  # Enable services
+  - systemctl enable --now fail2ban
+  - systemctl enable --now qemu-guest-agent
+  - systemctl enable --now prometheus-node-exporter
+  - systemctl enable --now unattended-upgrades

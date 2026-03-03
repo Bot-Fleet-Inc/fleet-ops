@@ -1,0 +1,258 @@
+# UniFi Firewall Rules for Bot Fleet Network
+#
+# Site: Vennelsborg (Site 1)
+# VLANs: 1010 (Bot Fleet), 1011 (LLM Inference)
+#
+# Rule processing: first match wins (ordered top to bottom)
+# All rules use UniFi firewall rule API format
+#
+# Reference: enterprise-continuum/Architecture/Technology/unifi-security-policies_technology.md
+
+---
+
+# ============================================================
+# Firewall Address Groups
+# ============================================================
+# Create these groups before creating rules that reference them.
+
+address_groups:
+
+  - name: "botfleet-dmz-ips"
+    group_type: "address-group"
+    group_members:
+      - "172.16.10.10"   # Tunnel VM
+      - "172.16.10.20"   # Change Management Bot
+      - "172.16.10.21"   # Dispatch Bot
+      - "172.16.10.22"   # Architecture Bot
+      - "172.16.10.23"   # Audit Bot
+      - "172.16.10.24"   # Coding Bot
+      - "172.16.10.25"   # Project Management Bot
+      - "172.16.10.30"   # DevOps Proxmox Bot
+      - "172.16.10.31"   # DevOps Cloudflare Bot
+      - "172.16.10.32"   # UniFi Network Bot
+      - "172.16.10.33"   # CRM Bot
+
+port_groups:
+
+  - name: "botfleet-llm-ports"
+    group_type: "port-group"
+    group_members:
+      - "8000"    # vLLM (OpenAI-compatible API)
+      - "11434"   # Ollama API
+
+  - name: "botfleet-admin-ports"
+    group_type: "port-group"
+    group_members:
+      - "22"      # SSH
+      - "443"     # HTTPS
+
+  - name: "botfleet-unifi-api-ports"
+    group_type: "port-group"
+    group_members:
+      - "443"     # UniFi HTTPS
+      - "8443"    # UniFi Controller API
+
+# ============================================================
+# Inter-VLAN Rules (LAN In)
+# ============================================================
+# These control east-west traffic between VLANs.
+# Processed in order — specific allows before catch-all deny.
+
+inter_vlan_rules:
+
+  # --- B1: Bots → LLM API ---
+  - name: "B1-BotFleet-to-LLM-API"
+    rule_index: 4001
+    enabled: true
+    action: "accept"
+    protocol: "tcp"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 1010"        # Bot Fleet
+    dst_networkconf_type: "NETv4"
+    dst_network: "VLAN 1011"        # LLM Inference
+    dst_port: "8000,11434"          # vLLM + Ollama
+    logging: false
+    description: "Allow bot fleet VMs to reach LLM inference API on VLAN 1011"
+
+  # --- B2: Admin → Bot Fleet (SSH + HTTPS) ---
+  - name: "B2-Admin-to-BotFleet"
+    rule_index: 4002
+    enabled: true
+    action: "accept"
+    protocol: "tcp"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 1"           # Admin/Management
+    dst_networkconf_type: "NETv4"
+    dst_network: "VLAN 1010"        # Bot Fleet
+    dst_port: "22,443"
+    logging: false
+    description: "Allow admin access to bot fleet for management"
+
+  # --- B3: Admin → LLM (full access) ---
+  - name: "B3-Admin-to-LLM"
+    rule_index: 4003
+    enabled: true
+    action: "accept"
+    protocol: "all"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 1"           # Admin/Management
+    dst_networkconf_type: "NETv4"
+    dst_network: "VLAN 1011"        # LLM Inference
+    logging: false
+    description: "Allow admin full access to LLM for model loading and maintenance"
+
+  # --- B4: Proxmox → Bot Fleet (management) ---
+  - name: "B4-Proxmox-to-BotFleet"
+    rule_index: 4004
+    enabled: true
+    action: "accept"
+    protocol: "all"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 200"         # Management (Proxmox at 10.200.0.2)
+    dst_networkconf_type: "NETv4"
+    dst_network: "VLAN 1010"        # Bot Fleet
+    logging: false
+    description: "Allow Proxmox management traffic to bot fleet VMs"
+
+  # --- B5: Proxmox → LLM (management) ---
+  - name: "B5-Proxmox-to-LLM"
+    rule_index: 4005
+    enabled: true
+    action: "accept"
+    protocol: "all"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 200"         # Management (Proxmox at 10.200.0.2)
+    dst_networkconf_type: "NETv4"
+    dst_network: "VLAN 1011"        # LLM Inference
+    logging: false
+    description: "Allow Proxmox management traffic to LLM inference VM"
+
+  # --- B6: VPN → Bot Fleet (emergency access) ---
+  - name: "B6-VPN-to-BotFleet"
+    rule_index: 4006
+    enabled: true
+    action: "accept"
+    protocol: "tcp"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 200"         # VPN
+    dst_networkconf_type: "NETv4"
+    dst_network: "VLAN 1010"        # Bot Fleet
+    dst_port: "22,443"
+    logging: true
+    description: "Allow VPN emergency access to bot fleet (SSH + HTTPS)"
+
+  # --- B7: DevOps Proxmox Bot → PVE API ---
+  - name: "B7-DevProxmox-to-PVE-API"
+    rule_index: 4007
+    enabled: true
+    action: "accept"
+    protocol: "tcp"
+    src_address: "172.16.10.30"     # DevOps Proxmox Bot
+    dst_networkconf_type: "NETv4"
+    dst_network: "VLAN 200"         # Management (Proxmox at 10.200.0.2)
+    dst_port: "8006"                # PVE API
+    logging: true
+    description: "Allow DevOps Proxmox bot to reach PVE API for infrastructure automation"
+
+  # --- B8: UniFi Bot → UniFi Controller API ---
+  - name: "B8-DevUnifi-to-UniFi-API"
+    rule_index: 4008
+    enabled: true
+    action: "accept"
+    protocol: "tcp"
+    src_address: "172.16.10.32"     # UniFi Network Bot
+    dst_networkconf_type: "NETv4"
+    dst_network: "VLAN 1"           # Admin/Management
+    dst_port: "443,8443"            # UniFi HTTPS + Controller API
+    logging: true
+    description: "Allow UniFi bot to reach UniFi Controller API for network automation"
+
+  # --- B9: Bot Fleet → ALL (default deny) ---
+  - name: "B9-BotFleet-DenyAll"
+    rule_index: 4009
+    enabled: true
+    action: "drop"
+    protocol: "all"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 1010"        # Bot Fleet
+    dst_networkconf_type: "NETv4"
+    dst_network: "ALL"              # All VLANs
+    logging: true
+    description: "DEFAULT DENY — Bot fleet cannot reach any other VLAN"
+
+  # --- B10: LLM → ALL (default deny) ---
+  - name: "B10-LLM-DenyAll"
+    rule_index: 4010
+    enabled: true
+    action: "drop"
+    protocol: "all"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 1011"        # LLM Inference
+    dst_networkconf_type: "NETv4"
+    dst_network: "ALL"              # All VLANs
+    logging: true
+    description: "DEFAULT DENY — LLM inference cannot reach any other VLAN"
+
+# ============================================================
+# WAN Out Rules
+# ============================================================
+# These control outbound internet access per source IP/VLAN.
+# Processed in order — specific allows before catch-all deny.
+
+wan_out_rules:
+
+  # --- W1: Tunnel VM → Cloudflare (TCP/443 only) ---
+  - name: "W1-Tunnel-to-Cloudflare"
+    rule_index: 5001
+    enabled: true
+    action: "accept"
+    protocol: "tcp"
+    src_address: "172.16.10.10"     # Tunnel VM
+    dst_port: "443"                 # HTTPS (Cloudflare tunnel)
+    logging: false
+    description: "Allow tunnel VM outbound to Cloudflare on TCP/443"
+
+  # --- W2: DMZ Bots → Internet (HTTP + HTTPS) ---
+  - name: "W2-DMZ-Bots-to-Internet"
+    rule_index: 5002
+    enabled: true
+    action: "accept"
+    protocol: "tcp"
+    src_firewallgroup: "botfleet-dmz-ips"
+    dst_port: "80,443"              # HTTP + HTTPS
+    logging: false
+    description: "Allow DMZ bots internet access for GitHub, npm, Claude API, etc."
+
+  # --- W3: All Bots → DNS + NTP ---
+  - name: "W3-BotFleet-DNS-NTP"
+    rule_index: 5003
+    enabled: true
+    action: "accept"
+    protocol: "udp"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 1010"        # Bot Fleet
+    dst_port: "53,123"              # DNS + NTP
+    logging: false
+    description: "Allow all bot fleet VMs to use DNS and NTP"
+
+  # --- W4: Bot Fleet → Internet (catch-all deny) ---
+  - name: "W4-BotFleet-DenyInternet"
+    rule_index: 5004
+    enabled: true
+    action: "drop"
+    protocol: "all"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 1010"        # Bot Fleet
+    logging: true
+    description: "AIR-GAP CATCH-ALL — Block all other bot fleet internet access"
+
+  # --- W5: LLM → Internet (total block) ---
+  - name: "W5-LLM-DenyInternet"
+    rule_index: 5005
+    enabled: true
+    action: "drop"
+    protocol: "all"
+    src_networkconf_type: "NETv4"
+    src_network: "VLAN 1011"        # LLM Inference
+    logging: true
+    description: "TOTAL BLOCK — LLM inference has zero internet access"

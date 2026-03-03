@@ -1,0 +1,35 @@
+# ☁️ devops-cloudflare-bot Memory
+
+> This file is curated automatically at 02:00 UTC daily.
+> Manual edits are preserved; automated curation only appends, promotes, and archives.
+
+## Fleet Knowledge
+
+<!-- Cross-bot learnings and shared context.
+     Examples: which bot handles what, common issue patterns across the fleet,
+     coordination conventions discovered through operation. -->
+
+- Fleet coordination hub: `Bot-Fleet-Inc/fleet-ops`
+- Issue bus: all inter-bot communication via GitHub Issues with label taxonomy
+- Escalation path: any bot -> `status:needs-human` label -> `jorbot` -> human
+- LLM inference: `http://172.16.11.10:8000` (vLLM), fallback `http://172.16.11.10:11434` (Ollama)
+
+## Domain Knowledge
+
+<!-- Bot-specific learnings about its domain.
+     Examples: recurring patterns in the domain, tools that work well,
+     edge cases discovered, domain-specific conventions. -->
+
+{{BOT_INITIAL_DOMAIN_KNOWLEDGE}}
+
+## Patterns
+
+<!-- Recurring patterns observed in work.
+     Promoted from Recent Decisions when a pattern recurs 3+ times.
+     Format: [date-first-seen] <pattern description> (seen N times) -->
+
+## Recent Decisions
+
+<!-- Important decisions and their rationale.
+     Auto-archived after 30 days, promoted to Patterns if recurring.
+     Format: [date] <decision> — Reason: <rationale> — Outcome: <result> -->

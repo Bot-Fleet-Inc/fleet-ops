@@ -1,0 +1,102 @@
+# 🎨 design-bot — Organisational Context
+
+## Organisation
+
+| Field | Value |
+|-------|-------|
+| Organisation | Bot Fleet Inc |
+| GitHub Org | Bot-Fleet-Inc |
+| Architecture Standard | enterprise-continuum |
+| Bot Fleet Repo | ai-bot-fleet-org |
+
+## Key Repositories
+
+| Repository | Purpose | Relevance to design-bot |
+|------------|---------|---------------------------|
+| [ai-bot-fleet-org](https://github.com/Bot-Fleet-Inc/fleet-ops) | Bot fleet coordination hub, infrastructure configs, shared code | Primary workspace — bot implementation and coordination |
+| [enterprise-continuum](https://github.com/Bot-Fleet-Inc/bot-fleet-continuum) | Enterprise architecture standards, skills, ArchiMate models | Read-only reference — all outputs must comply with these standards |
+
+{{BOT_ADDITIONAL_REPOS}}
+
+## Fleet Roster
+
+### Core Bots — Decide and Coordinate
+
+| Bot | GitHub User | Role | VMID | IP | Tier | Emoji |
+|-----|-------------|------|------|----|------|-------|
+| Jorbot | jorbot | Human-adjacent oversight | — | Mac Mini | — | — |
+| Change Mgmt Bot | change-mgmt-bot | Event detection, issue creation | 410 | 172.16.10.20 | DMZ | {{CHANGEMGMT_EMOJI}} |
+| Dispatch Bot | dispatch-bot | Issue triage, assignment, progress tracking | 411 | 172.16.10.21 | DMZ | {{DISPATCH_EMOJI}} |
+| Archi Bot | archi-bot | ArchiMate model maintenance | 412 | 172.16.10.22 | DMZ | {{ARCHI_EMOJI}} |
+| Audit Bot | audit-bot | EA compliance review (read-only) | 413 | 172.16.10.23 | DMZ | {{AUDIT_EMOJI}} |
+| Coding Bot | coding-bot | Code review, implementation, CI/CD | 414 | 172.16.10.24 | DMZ | {{CODING_EMOJI}} |
+| Project Mgmt Bot | project-mgmt-bot | GitHub Projects, status tracking | 415 | 172.16.10.25 | DMZ | {{PROJECTMGMT_EMOJI}} |
+
+### DevOps and Specialist Bots — Do Work
+
+| Bot | GitHub User | Role | VMID | IP | Tier | Emoji |
+|-----|-------------|------|------|----|------|-------|
+| DevOps Proxmox Bot | devops-proxmox-bot | VM provisioning, Proxmox management | 420 | 172.16.10.30 | Infra-Access | {{DEVPROXMOX_EMOJI}} |
+| DevOps Cloudflare Bot | devops-cloudflare-bot | Workers, DNS, Tunnels, Zero Trust | 421 | 172.16.10.31 | DMZ | {{DEVCLOUDFLARE_EMOJI}} |
+| UniFi Network Bot | unifi-network-bot | VLANs, firewall rules, switches | 422 | 172.16.10.32 | Infra-Access | {{DEVUNIFI_EMOJI}} |
+| CRM Bot | crm-bot | Customer relationship, support tickets | 423 | 172.16.10.33 | DMZ | {{CRM_EMOJI}} |
+
+### Infrastructure Services
+
+| Service | VMID | IP | VLAN | Purpose |
+|---------|------|----|------|---------|
+| Cloudflare Tunnel | 400 | 172.16.10.10 | 1010 | Inbound webhook routing |
+| LLM Inference (A10) | 450 | 172.16.11.10 | 1011 | Local model inference (vLLM + Ollama) |
+
+## Infrastructure Context
+
+| Parameter | Value |
+|-----------|-------|
+| Site | Vennelsborg (Site 1) |
+| Proxmox Node | `proxmox` (AMD EPYC 7282, 62 GB RAM) |
+| Bot Fleet VLAN | 1010 (172.16.10.0/24) |
+| LLM Inference VLAN | 1011 (172.16.11.0/24) |
+| Management VLAN | 200 (10.200.0.0/24) |
+| VM Template | 9000 (ubuntu-2404-cloudinit-template) |
+| OS | Ubuntu 24.04 LTS |
+| Storage | raid2z (ZFS) |
+
+## Coordination Model
+
+### GitHub Issues as Coordination Bus
+
+All bot-to-bot communication flows through GitHub Issues:
+
+- **Work assignment**: Issues are assigned to bot GitHub users.
+- **Status updates**: Bots post comments on issues they are working on.
+- **Delegation**: Bots create new issues or reassign existing ones to other bots.
+- **Completion**: Bots close issues when acceptance criteria are met, with a summary comment.
+- **Escalation**: Bots add `status:needs-human` label and assign to `jorbot`.
+
+### Label Taxonomy
+
+| Label Prefix | Purpose | Example |
+|--------------|---------|---------|
+| `bot:` | Target bot for the issue | `bot:coding-bot` |
+| `status:` | Current issue state | `status:in-progress`, `status:needs-human`, `status:dead-letter` |
+| `priority:` | Issue priority | `priority:high`, `priority:low` |
+| `domain:` | Domain area | `domain:infrastructure`, `domain:architecture` |
+| `type:` | Issue type | `type:task`, `type:review`, `type:incident` |
+
+## Domain Knowledge
+
+{{BOT_DOMAIN_KNOWLEDGE}}
+
+## Standards Reference
+
+All bot outputs must comply with enterprise-continuum standards:
+
+| Standard | Applies To | Key Convention |
+|----------|-----------|----------------|
+| ArchiMate | Architecture models, viewpoints | Layered viewpoints with element relationships |
+| BPMN | Process definitions | Pools, lanes, gateways for workflow modelling |
+| ea-deploy-proxmox | VM provisioning | `[env]-[service]-[role]-[instance]` naming, VMID 400-499 |
+| ea-network-unifi | Network configuration | Per-site VLAN encoding, zone-based firewall rules |
+| zero-trust-tunnels | External access | One tunnel per location, Cloudflare Access policies |
+| TypeScript/Python | Code implementations | Linting, typing, test coverage per enterprise standard |
+| Cloudflare patterns | Edge deployments | Workers, Pages, D1 patterns from enterprise-continuum |

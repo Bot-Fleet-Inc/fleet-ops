@@ -1,0 +1,34 @@
+# VLAN Definitions — Vennelsborg Bot Fleet
+#
+# Defines the two VLANs used by the bot fleet infrastructure.
+# Used by deploy scripts for network validation and assignment.
+#
+# Full design: infra/networking/vlan-design.md
+
+vlans:
+  - id: 1010
+    name: "Bot Fleet"
+    vnet: "vnet-botfleet"
+    subnet: "172.16.10.0/24"
+    gateway: "172.16.10.1"
+    dhcp: false
+    internet: "per-ip"
+    description: "All bot VMs and tunnel infrastructure"
+    ip_ranges:
+      infrastructure: "172.16.10.1-19"
+      standard_bots: "172.16.10.20-29"
+      infra_bots: "172.16.10.30-39"
+      air_gapped: "172.16.10.40-49"
+      reserved: "172.16.10.50-254"
+
+  - id: 1011
+    name: "LLM Inference"
+    vnet: "vnet-llm"
+    subnet: "172.16.11.0/24"
+    gateway: "172.16.11.1"
+    dhcp: false
+    internet: "none"
+    description: "GPU inference servers — fully air-gapped"
+    ip_ranges:
+      gpu_servers: "172.16.11.10-19"
+      reserved: "172.16.11.20-254"

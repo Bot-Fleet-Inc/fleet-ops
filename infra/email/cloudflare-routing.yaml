@@ -1,0 +1,41 @@
+# Cloudflare Email Routing configuration for bot-fleet.org
+# Account: Bot Fleet Inc (b7079628ac25013a2ea7c92db2c99224)
+# Zone ID: 0a8a69752470f2d59868b05eb621d813
+#
+# Reference: docs/email-infrastructure.md, docs/cloudflare-credentials.md
+
+zone: bot-fleet.org
+
+# DNS records (created automatically when Email Routing is enabled)
+# Actual priorities assigned by Cloudflare — values below match live config
+dns_records:
+  - type: MX
+    name: bot-fleet.org
+    value: route1.mx.cloudflare.net
+    priority: 99
+  - type: MX
+    name: bot-fleet.org
+    value: route2.mx.cloudflare.net
+    priority: 25
+  - type: MX
+    name: bot-fleet.org
+    value: route3.mx.cloudflare.net
+    priority: 40
+  - type: TXT
+    name: bot-fleet.org
+    value: "v=spf1 include:_spf.mx.cloudflare.net ~all"
+
+# Custom routes (evaluated before catch-all)
+rules:
+  - name: "Forward jorgen@ to personal email"
+    match: jorgen@bot-fleet.org
+    action: forward
+    destination: jorgen@scheel.no
+
+# Catch-all routes all *@bot-fleet.org to the Email Worker
+catch_all:
+  action: route_to_worker
+  worker: botfleet-email
+
+# The Worker (infra/email/worker/) receives emails, parses them,
+# and stores them in KV namespace BOTFLEET_EMAIL for API retrieval.

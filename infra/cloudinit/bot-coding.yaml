@@ -1,0 +1,209 @@
+#cloud-config
+# Cloud-Init: Coding Bot VM
+#
+# Target: VMID 414 (prod-botfleet-coding-01)
+# Resources: 4 vCPU / 8 GB RAM / 128 GB disk
+# VLAN: 1010 (172.16.10.24)
+# Purpose: Standard bot runtime + Docker + build tools
+#
+# Merged with global-admins.yaml by deploy pipeline.
+# Post-deploy: inject ANTHROPIC_API_KEY and GITHUB_TOKEN.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  # System utilities
+  - curl
+  - wget
+  - gnupg
+  - ca-certificates
+  - jq
+  - htop
+  - net-tools
+  - tmux
+  - vim
+  - nano
+  - git
+  - unzip
+  - rsync
+  - tree
+  # Python runtime
+  - python3
+  - python3-pip
+  - python3-venv
+  - python3-dev
+  # Build tools (coding bot only)
+  - build-essential
+  - cmake
+  - pkg-config
+  # Security
+  - fail2ban
+  - ufw
+  - unattended-upgrades
+  # Infrastructure
+  - qemu-guest-agent
+  - prometheus-node-exporter
+  # Logging
+  - rsyslog
+  - logrotate
+  - sysstat
+
+write_files:
+  - path: /etc/ufw/applications.d/botfleet
+    content: |
+      [SSH]
+      title=OpenSSH Server
+      description=OpenSSH server
+      ports=22/tcp
+    permissions: "0644"
+
+  - path: /etc/fail2ban/jail.d/botfleet.conf
+    content: |
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 5
+      bantime = 3600
+      findtime = 600
+    permissions: "0644"
+
+  - path: /usr/local/bin/install-docker.sh
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      # Install Docker CE from official repository
+      install -m 0755 -d /etc/apt/keyrings
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      chmod a+r /etc/apt/keyrings/docker.asc
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list
+      apt-get update
+      apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      systemctl enable --now docker
+    permissions: "0755"
+
+  - path: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "storage-driver": "overlay2"
+      }
+    permissions: "0644"
+
+  - path: /usr/local/bin/sysinfo
+    content: |
+      #!/bin/bash
+      echo "=== System Info ==="
+      echo "Hostname: $(hostname)"
+      echo "Uptime: $(uptime -p)"
+      echo "IP: $(hostname -I | awk '{print $1}')"
+      echo "Disk: $(df -h / | tail -1 | awk '{print $3 "/" $2 " (" $5 ")"}')"
+      echo "Memory: $(free -h | awk '/Mem:/{print $3 "/" $2}')"
+      echo ""
+      echo "=== Bot Runtime ==="
+      node --version 2>/dev/null && echo "Node.js: $(node --version)" || echo "Node.js: not installed"
+      python3 --version 2>/dev/null && echo "Python: $(python3 --version)" || echo "Python: not installed"
+      claude --version 2>/dev/null && echo "Claude Code: $(claude --version)" || echo "Claude Code: not installed"
+      docker --version 2>/dev/null && echo "Docker: $(docker --version)" || echo "Docker: not installed"
+      echo ""
+      echo "=== Services ==="
+      systemctl is-active docker && echo "docker: active" || echo "docker: inactive"
+      systemctl is-active prometheus-node-exporter && echo "node-exporter: active" || echo "node-exporter: inactive"
+      systemctl is-active fail2ban && echo "fail2ban: active" || echo "fail2ban: inactive"
+    permissions: "0755"
+
+  - path: /etc/motd
+    content: |
+      ┌─────────────────────────────────────────┐
+      │  Vennelsborg Bot Fleet — Coding Bot      │
+      │  VMID 414 · 172.16.10.24 · VLAN 1010    │
+      │  Role: Build / Test / Docker             │
+      │  Run `sysinfo` for system status         │
+      └─────────────────────────────────────────┘
+    permissions: "0644"
+
+  - path: /opt/bot/README.md
+    content: |
+      # Coding Bot Workspace
+
+      This directory is the coding bot's working area.
+
+      ## Structure
+      - `/opt/bot/workspace/` — Git clones and active work
+      - `/opt/bot/compose/` — Docker Compose projects
+      - `/var/log/bot/` — Bot-specific logs
+
+      ## Environment
+      Required environment variables (injected post-deploy):
+      - `ANTHROPIC_API_KEY` — Claude API access
+      - `GITHUB_TOKEN` — GitHub API access for issue coordination
+
+      ## Runtime
+      - Python 3 with pip, venv, poetry
+      - Node.js 20 LTS with npm, TypeScript, ts-node
+      - Claude Code CLI (`claude`)
+      - GitHub CLI (`gh`)
+      - Docker CE with Compose plugin
+      - Build tools (gcc, cmake, pkg-config)
+
+      ## Open Ports (UFW)
+      - 22/tcp — SSH
+      - 3000/tcp — Dev server
+      - 5000/tcp — Dev server
+      - 8000/tcp — Dev server
+      - 8080/tcp — Dev server
+    permissions: "0644"
+
+runcmd:
+  # Install Node.js 20 LTS
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+
+  # Install Claude Code CLI
+  - npm install -g @anthropic-ai/claude-code
+
+  # Install TypeScript tooling
+  - npm install -g typescript ts-node
+
+  # Install Python dev tools
+  - pip3 install --break-system-packages virtualenv poetry
+
+  # Install GitHub CLI
+  - curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | tee /usr/share/keyrings/githubcli-archive-keyring.gpg >/dev/null
+  - chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list
+  - apt-get update
+  - apt-get install -y gh
+
+  # Install Python libraries for bot coordination
+  - pip3 install --break-system-packages PyGithub requests
+
+  # Install Docker
+  - bash /usr/local/bin/install-docker.sh
+
+  # Create bot workspace directories
+  - mkdir -p /opt/bot/workspace
+  - mkdir -p /opt/bot/compose
+  - mkdir -p /var/log/bot
+
+  # Enable UFW — SSH + dev ports
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp comment "SSH"
+  - ufw allow 3000/tcp comment "Dev server"
+  - ufw allow 5000/tcp comment "Dev server"
+  - ufw allow 8000/tcp comment "Dev server"
+  - ufw allow 8080/tcp comment "Dev server"
+  - ufw --force enable
+
+  # Enable services
+  - systemctl enable --now fail2ban
+  - systemctl enable --now qemu-guest-agent
+  - systemctl enable --now prometheus-node-exporter
+  - systemctl enable --now unattended-upgrades

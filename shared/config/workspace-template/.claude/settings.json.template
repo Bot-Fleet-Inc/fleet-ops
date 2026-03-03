@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh *)",
+      "Bash(curl -sf http://172.16.11.10:*)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(date *)",
+      "Bash(find /home/botuser/workspace *)",
+      "Bash(grep *)",
+      "Bash(sort *)",
+      "Bash(jq *)",
+      "Bash(mkdir -p /home/botuser/workspace/*)",
+      "Read",
+      "Write(/home/botuser/workspace/*)",
+      "Edit(/home/botuser/workspace/*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(sudo *)",
+      "Bash(chmod 777 *)",
+      "Bash(curl * --upload-file *)",
+      "Bash(wget *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(rsync *)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)"
+    ]
+  },
+  "env": {
+    "BOT_NAME": "{{BOT_NAME}}",
+    "BOT_ROLE": "{{BOT_ROLE}}",
+    "GITHUB_USER": "{{GITHUB_USER}}",
+    "LLM_ENDPOINT": "http://172.16.11.10:8000",
+    "LLM_FALLBACK_ENDPOINT": "http://172.16.11.10:11434"
+  }
+}

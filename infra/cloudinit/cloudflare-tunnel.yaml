@@ -1,0 +1,96 @@
+#cloud-config
+# Cloud-Init: Cloudflare Tunnel VM
+#
+# Target: VMID 400 (prod-botfleet-tunnel-01)
+# Resources: 1 vCPU / 2 GB RAM / 32 GB disk
+# VLAN: 1010 (172.16.10.10)
+# Purpose: Cloudflare Tunnel ingress — minimal footprint
+#
+# Merged with global-admins.yaml by deploy pipeline.
+# Post-deploy: run `cloudflared service install <TOKEN>` to configure tunnel.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - wget
+  - gnupg
+  - ca-certificates
+  - jq
+  - htop
+  - nano
+  - net-tools
+  - fail2ban
+  - ufw
+  - unattended-upgrades
+  - qemu-guest-agent
+  - prometheus-node-exporter
+
+write_files:
+  - path: /etc/ufw/applications.d/botfleet
+    content: |
+      [SSH]
+      title=OpenSSH Server
+      description=OpenSSH server
+      ports=22/tcp
+    permissions: "0644"
+
+  - path: /etc/fail2ban/jail.d/botfleet.conf
+    content: |
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 5
+      bantime = 3600
+      findtime = 600
+    permissions: "0644"
+
+  - path: /usr/local/bin/sysinfo
+    content: |
+      #!/bin/bash
+      echo "=== System Info ==="
+      echo "Hostname: $(hostname)"
+      echo "Uptime: $(uptime -p)"
+      echo "IP: $(hostname -I | awk '{print $1}')"
+      echo "Disk: $(df -h / | tail -1 | awk '{print $3 "/" $2 " (" $5 ")"}')"
+      echo "Memory: $(free -h | awk '/Mem:/{print $3 "/" $2}')"
+      echo "=== Services ==="
+      systemctl is-active cloudflared 2>/dev/null && echo "cloudflared: active" || echo "cloudflared: not configured"
+      systemctl is-active prometheus-node-exporter && echo "node-exporter: active" || echo "node-exporter: inactive"
+    permissions: "0755"
+
+  - path: /etc/motd
+    content: |
+      ┌─────────────────────────────────────────┐
+      │  Vennelsborg Bot Fleet — Tunnel VM       │
+      │  VMID 400 · 172.16.10.10 · VLAN 1010    │
+      │  Role: Cloudflare Tunnel Ingress         │
+      │  Run `sysinfo` for system status         │
+      └─────────────────────────────────────────┘
+    permissions: "0644"
+
+runcmd:
+  # Install cloudflared from official apt repo
+  - mkdir -p --mode=0755 /usr/share/keyrings
+  - curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+  - echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/cloudflared.list
+  - apt-get update
+  - apt-get install -y cloudflared
+
+  # Enable UFW — SSH only
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp comment "SSH"
+  - ufw --force enable
+
+  # Enable services
+  - systemctl enable --now fail2ban
+  - systemctl enable --now qemu-guest-agent
+  - systemctl enable --now prometheus-node-exporter
+  - systemctl enable --now unattended-upgrades
+
+  # Note: cloudflared service is configured post-deploy with:
+  #   cloudflared service install <TUNNEL_TOKEN>

@@ -1,0 +1,207 @@
+#cloud-config
+# Cloud-Init: LLM Inference VM
+#
+# Target: VMID 450 (prod-llm-inference-01)
+# Resources: 8 vCPU / 32 GB RAM / 256 GB disk + Nvidia A10 GPU
+# VLAN: 1011 (172.16.11.10) — air-gapped, no internet
+# Purpose: vLLM + Ollama inference server for bot fleet
+#
+# IMPORTANT: Air-gap provisioning workaround
+#   VLAN 1011 has no internet. During initial provisioning:
+#   1. Temporarily attach VM to vnet-botfleet (VLAN 1010)
+#   2. Run Cloud-Init (this file) — packages and runcmd need internet
+#   3. After provisioning completes, switch NIC to vnet-llm (VLAN 1011)
+#   4. Update IP to 172.16.11.10/24, gateway 172.16.11.1
+#
+# Merged with global-admins.yaml by deploy pipeline.
+# Post-deploy: load models via SCP (see /opt/llm/README.md).
+
+package_update: true
+package_upgrade: true
+
+packages:
+  # System utilities (reduced set)
+  - curl
+  - wget
+  - gnupg
+  - ca-certificates
+  - jq
+  - htop
+  - net-tools
+  - vim
+  - nano
+  - git
+  - unzip
+  # Python runtime
+  - python3
+  - python3-pip
+  - python3-venv
+  - python3-dev
+  # Nvidia drivers
+  - nvidia-driver-550-server
+  - nvidia-utils-550-server
+  # Security
+  - fail2ban
+  - ufw
+  - unattended-upgrades
+  # Infrastructure
+  - qemu-guest-agent
+  # Note: NO prometheus-node-exporter (air-gapped VLAN, no Prometheus to scrape)
+
+write_files:
+  - path: /etc/systemd/system/vllm.service
+    content: |
+      [Unit]
+      Description=vLLM OpenAI-compatible API Server
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=llm
+      WorkingDirectory=/opt/llm
+      ExecStart=/opt/llm/venv/bin/python -m vllm.entrypoints.openai.api_server \
+        --model /opt/llm/models/current \
+        --host 0.0.0.0 \
+        --port 8000 \
+        --gpu-memory-utilization 0.9 \
+        --max-model-len 8192
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+    permissions: "0644"
+
+  - path: /etc/systemd/system/ollama.service.d/override.conf
+    content: |
+      [Service]
+      Environment="OLLAMA_HOST=0.0.0.0:11434"
+    permissions: "0644"
+
+  - path: /etc/fail2ban/jail.d/botfleet.conf
+    content: |
+      [sshd]
+      enabled = true
+      port = ssh
+      filter = sshd
+      logpath = /var/log/auth.log
+      maxretry = 5
+      bantime = 3600
+      findtime = 600
+    permissions: "0644"
+
+  - path: /usr/local/bin/sysinfo
+    content: |
+      #!/bin/bash
+      echo "=== System Info ==="
+      echo "Hostname: $(hostname)"
+      echo "Uptime: $(uptime -p)"
+      echo "IP: $(hostname -I | awk '{print $1}')"
+      echo "Disk: $(df -h / | tail -1 | awk '{print $3 "/" $2 " (" $5 ")"}')"
+      echo "Memory: $(free -h | awk '/Mem:/{print $3 "/" $2}')"
+      echo ""
+      echo "=== GPU ==="
+      nvidia-smi --query-gpu=name,temperature.gpu,memory.used,memory.total,utilization.gpu --format=csv,noheader 2>/dev/null || echo "GPU: not available"
+      echo ""
+      echo "=== LLM Services ==="
+      systemctl is-active vllm && echo "vLLM: active (port 8000)" || echo "vLLM: inactive"
+      systemctl is-active ollama && echo "Ollama: active (port 11434)" || echo "Ollama: inactive"
+      echo ""
+      echo "=== Models ==="
+      ls -la /opt/llm/models/current 2>/dev/null || echo "No model loaded (symlink /opt/llm/models/current not set)"
+    permissions: "0755"
+
+  - path: /etc/motd
+    content: |
+      ┌─────────────────────────────────────────┐
+      │  Vennelsborg Bot Fleet — LLM Inference   │
+      │  VMID 450 · 172.16.11.10 · VLAN 1011    │
+      │  GPU: Nvidia A10 (24 GB VRAM)            │
+      │  AIR-GAPPED — No internet access         │
+      │  Run `sysinfo` for system status         │
+      └─────────────────────────────────────────┘
+    permissions: "0644"
+
+  - path: /opt/llm/README.md
+    content: |
+      # LLM Inference Server
+
+      Air-gapped inference server on VLAN 1011.
+      Serves bot fleet VMs on VLAN 1010 via firewall rule B1.
+
+      ## Services
+      - **vLLM** — Port 8000 (OpenAI-compatible API)
+      - **Ollama** — Port 11434 (Ollama API + OpenAI compat)
+
+      ## Loading Models
+
+      VLAN 1011 has no internet. Models must be transferred manually.
+
+      ### Via SCP (from admin workstation)
+      ```bash
+      scp -r /path/to/model/ llm@172.16.11.10:/opt/llm/models/
+      ```
+
+      ### Activate a model
+      ```bash
+      # Set symlink to active model
+      ln -sfn /opt/llm/models/<model-dir> /opt/llm/models/current
+
+      # Start vLLM
+      sudo systemctl enable --now vllm
+      ```
+
+      ## Directory Structure
+      - `/opt/llm/models/` — Model weights
+      - `/opt/llm/models/current` — Symlink to active model
+      - `/opt/llm/venv/` — Python virtual environment (vLLM)
+      - `/opt/llm/logs/` — Service logs
+
+      ## GPU Info
+      ```bash
+      nvidia-smi              # Quick status
+      nvidia-smi -l 2         # Continuous monitoring
+      ```
+    permissions: "0644"
+
+runcmd:
+  # Create llm user
+  - useradd -r -m -d /opt/llm -s /bin/bash llm
+
+  # Create directory structure
+  - mkdir -p /opt/llm/models
+  - mkdir -p /opt/llm/venv
+  - mkdir -p /opt/llm/logs
+
+  # Create Python venv and install vLLM
+  - python3 -m venv /opt/llm/venv
+  - /opt/llm/venv/bin/pip install --upgrade pip
+  - /opt/llm/venv/bin/pip install vllm
+
+  # Install Ollama
+  - curl -fsSL https://ollama.com/install.sh | sh
+
+  # Create Ollama override directory (write_files may run before package install)
+  - mkdir -p /etc/systemd/system/ollama.service.d
+  - systemctl daemon-reload
+
+  # Set ownership
+  - chown -R llm:llm /opt/llm
+
+  # Enable UFW — SSH + LLM ports from bot fleet subnet only
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp comment "SSH"
+  - ufw allow from 172.16.10.0/24 to any port 8000 proto tcp comment "vLLM API from bot fleet"
+  - ufw allow from 172.16.10.0/24 to any port 11434 proto tcp comment "Ollama API from bot fleet"
+  - ufw --force enable
+
+  # Enable services
+  - systemctl enable --now fail2ban
+  - systemctl enable --now qemu-guest-agent
+  - systemctl enable --now unattended-upgrades
+
+  # vLLM service is installed but NOT started (no model loaded yet)
+  # Start manually after loading a model:
+  #   ln -sfn /opt/llm/models/<model> /opt/llm/models/current
+  #   systemctl enable --now vllm

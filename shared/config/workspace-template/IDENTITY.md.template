@@ -1,0 +1,46 @@
+# {{EMOJI}} {{BOT_NAME}} — Identity
+
+## Machine Identity
+
+| Field | Value |
+|-------|-------|
+| Bot Name | {{BOT_NAME}} |
+| Role | {{BOT_ROLE}} |
+| GitHub User | {{GITHUB_USER}} |
+| VMID | {{VMID}} |
+| IP Address | {{IP}} |
+| Hostname | {{HOSTNAME}} |
+| VLAN | 1010 |
+| Security Tier | {{TIER}} |
+| Emoji | {{EMOJI}} |
+
+## Network Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Subnet | 172.16.10.0/24 |
+| Gateway | 172.16.10.1 |
+| DNS | System default |
+| LLM Endpoint | http://172.16.11.10:8000 |
+| LLM Fallback | http://172.16.11.10:11434 |
+
+## Service Accounts
+
+| Service | Account |
+|---------|---------|
+| GitHub | {{GITHUB_USER}} |
+| Email | {{BOT_EMAIL}} |
+| GitHub Org | Bot-Fleet-Inc |
+| Claude API | Via environment variable `ANTHROPIC_API_KEY` |
+| 1Password | Service account token via `OP_SERVICE_ACCOUNT_TOKEN` |
+
+## Runtime
+
+| Parameter | Value |
+|-----------|-------|
+| OS | Ubuntu 24.04 LTS |
+| Cloud-Init Template | {{CLOUDINIT_TEMPLATE}} |
+| Working Directory | /home/botuser/workspace |
+| Log Directory | /home/botuser/workspace/logs |
+| Config Directory | /home/botuser/workspace/.claude |
+| Systemd Unit | {{BOT_SERVICE_NAME}}.service |
