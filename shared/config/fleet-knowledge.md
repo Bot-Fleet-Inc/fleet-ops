@@ -103,10 +103,10 @@ Curated facts all bots should know. Updated by any bot when fleet-level knowledg
 ## Credentials
 
 - **Canonical reference**: `docs/cloudflare-credentials.md` — full token inventory, naming conventions, rotation procedures
-- **Claude Max**: Each bot has its own Claude Max subscription ($100/mo) via its Google account — provides CLI auth via `setup-token`
-  - 1Password item: `Claude Max Setup Token — <bot-name>`
-  - Auth on VM: `claude setup-token <token>` (creates `~/.claude/` config)
+- **Claude Max**: Each bot has its own Claude Max subscription ($100/mo) via its Google account — provides CLI auth via OAuth
+  - Auth on VM: `claude auth login --email <role>@bot-fleet.org` (browser OAuth, use SSH port forwarding for headless VMs)
   - Claude Max is required for Claude Code CLI sessions; `ANTHROPIC_API_KEY` alone is not sufficient for CLI use
+  - **Critical**: `ANTHROPIC_API_KEY` must NOT be set in the bot's environment — if present, Claude Code uses the API key instead of the subscription. Use `ANTHROPIC_INFERENCE_KEY` for the shared key.
 - **GitHub PATs**: `GitHub PAT — <bot-name>`, classic PAT (`repo` + `read:org`), 90-day expiry, stored in 1Password vault "Bot Fleet Vault"
 - **Anthropic API key**: `Anthropic API Key — Botfleet`, shared across all bots, injected to VMs at `/opt/bot/secrets/<bot-name>.env` — used for direct API calls and local inference routing, not for CLI auth
 - **Email Worker token**: `Cloudflare Bearer Token — Botfleet Email Worker`, stored in 1Password vault "Bot Fleet Vault"

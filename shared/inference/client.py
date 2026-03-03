@@ -32,7 +32,11 @@ logger = logging.getLogger(__name__)
 
 # Defaults
 LOCAL_LLM_URL = os.environ.get("LOCAL_LLM_URL", "http://172.16.11.10:8000")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+# Use ANTHROPIC_INFERENCE_KEY (preferred) to avoid conflicting with Claude Code CLI,
+# which will use ANTHROPIC_API_KEY instead of the Max subscription if that var is set.
+ANTHROPIC_API_KEY = os.environ.get(
+    "ANTHROPIC_INFERENCE_KEY", os.environ.get("ANTHROPIC_API_KEY", "")
+)
 
 # Claude model identifiers
 CLAUDE_SONNET = "claude-sonnet-4-20250514"

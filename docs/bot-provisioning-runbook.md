@@ -157,22 +157,18 @@ See `docs/1password-entry-standard.md` for the full entry template and `docs/clo
 
 ### Step 1.7: Subscribe to Claude Max
 
-Claude Code CLI requires subscription auth — an `ANTHROPIC_API_KEY` alone is not sufficient. Each bot needs its own Claude Max subscription.
+Claude Code CLI requires subscription auth — an `ANTHROPIC_API_KEY` alone is not sufficient for CLI sessions. Each bot needs its own Claude Max subscription.
 
 1. Open an incognito browser window
 2. Log in to [claude.ai](https://claude.ai) as `<role>@bot-fleet.org` (use the Google account created in Step 1.1)
 3. Subscribe to **Claude Max** ($100/month)
-4. Navigate to **Settings → API / CLI → Setup Token**
-5. Generate a setup token
-6. Store in 1Password vault "Bot Fleet Vault":
-   - Item name: `Claude Max Setup Token — <bot-name>`
-   - Type: API Credential
-   - credential: the setup token value
-   - Tags: `botfleet`, `claude-max`, `role-<name>`
+4. Verify subscription is active at [claude.ai/settings](https://claude.ai/settings)
+
+Authentication on the VM happens during deployment (Step 4b in `docs/deployment-runbook.md`) using `claude auth login` with browser-based OAuth.
 
 > **Cost**: $100/month per bot. Only subscribe when the bot is ready for deployment — not during identity provisioning. See `docs/br-playbook.md` for the full onboarding lifecycle.
 
-> **Auth model**: Claude Max provides CLI authentication via `setup-token`. This replaces the previous approach of using `ANTHROPIC_API_KEY` in the environment file. The API key may still be used for direct API calls (e.g., local inference routing), but the CLI session uses the Max subscription.
+> **Critical env var**: The bot's env file must use `ANTHROPIC_INFERENCE_KEY` (not `ANTHROPIC_API_KEY`) for the shared Anthropic key. If `ANTHROPIC_API_KEY` is set, Claude Code ignores the Max subscription and charges the API key instead.
 
 ---
 

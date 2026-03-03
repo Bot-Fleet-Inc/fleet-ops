@@ -121,7 +121,7 @@ CHAT_WORKER_TOKEN=$(op read "op://Bot Fleet Vault/Cloudflare Bearer Token - Botf
 
 cat > /opt/bot/secrets/<bot-name>.env << EOF
 GITHUB_TOKEN=${GITHUB_TOKEN}
-ANTHROPIC_API_KEY=${ANTHROPIC_KEY}
+ANTHROPIC_INFERENCE_KEY=${ANTHROPIC_KEY}
 CHAT_WORKER_TOKEN=${CHAT_WORKER_TOKEN}
 BOT_NAME=<bot-name>
 LOCAL_LLM_URL=http://172.16.11.10:8000
@@ -136,36 +136,43 @@ chown bot:bot /opt/bot/secrets/<bot-name>.env
 
 ## Step 4b: Authenticate Claude Code CLI (Claude Max)
 
-Claude Code CLI requires subscription auth — `ANTHROPIC_API_KEY` alone is not sufficient for CLI sessions.
+Claude Code CLI requires subscription auth — `ANTHROPIC_API_KEY` alone is **not sufficient** for CLI sessions. Worse: if `ANTHROPIC_API_KEY` is set in the environment, Claude Code will use it instead of the subscription (incurring API charges). The env file must use `ANTHROPIC_INFERENCE_KEY` instead (see Step 4 above).
 
 ### Subscribe to Claude Max
 
 If not already done (see `docs/bot-provisioning-runbook.md` Step 1.7):
 
 1. Log in to [claude.ai](https://claude.ai) as the bot's Google account (`<role>@bot-fleet.org`)
-2. Subscribe to Claude Max ($100/month)
-3. Generate a setup token from **Settings → API / CLI → Setup Token**
-4. Store the token in 1Password: `Claude Max Setup Token — <bot-name>`
+2. Subscribe to **Claude Max** ($100/month)
 
-### Authenticate on the VM
+### Authenticate on the VM (headless OAuth)
+
+The CLI uses browser-based OAuth. On a headless VM, use SSH port forwarding:
 
 ```bash
-# As the bot user on the VM:
-sudo -u bot /usr/bin/claude setup-token <token-from-1password>
+# From your Mac — SSH to VM with port forwarding for OAuth callback
+ssh -L 8080:localhost:8080 admin@<ip-address>
+
+# On the VM, as the bot user:
+sudo -u bot /usr/bin/claude auth login --email <role>@bot-fleet.org
 ```
+
+The CLI will display a localhost URL. Since port 8080 is forwarded, open that URL in your **local Mac browser**. Log in with the bot's Google account to complete OAuth.
+
+> **If port forwarding doesn't work**: Press `c` in the terminal to copy the OAuth URL, then paste it into your local browser. The CLI shows the URL it's waiting on.
 
 This creates `~/.claude/` auth config for the bot user. The existing systemd unit (`bot@.service`) will use this auth automatically.
 
 ### Verify
 
 ```bash
-sudo -u bot /usr/bin/claude --version
+sudo -u bot /usr/bin/claude auth status
 sudo -u bot /usr/bin/claude -p "Say hello" --model sonnet
 ```
 
-Expected: Claude responds with a greeting. If it errors with an auth message, the setup token is invalid or expired — regenerate from claude.ai.
+Expected: `auth status` shows the bot's email. The `-p` test returns a greeting. If it errors with a 403, verify the Claude Max subscription is active at [claude.ai/settings](https://claude.ai/settings).
 
-> **Note**: The `ANTHROPIC_API_KEY` in the env file is still used for direct Anthropic API calls (e.g., shared inference routing). The Claude Max setup token authenticates the Claude Code CLI session specifically.
+> **Critical**: Ensure `ANTHROPIC_API_KEY` is NOT set in the bot's environment. The env file should use `ANTHROPIC_INFERENCE_KEY` for the shared Anthropic key (used only by the local inference routing library). If `ANTHROPIC_API_KEY` exists, Claude Code ignores the subscription and charges the API key instead.
 
 ## Step 5: Authenticate gh CLI
 
