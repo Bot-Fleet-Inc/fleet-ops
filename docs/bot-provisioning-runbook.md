@@ -15,7 +15,7 @@ Adding a new bot requires three phases:
 |-------|-------|----------|-------|
 | **1. Identity** | Human | ~15 min | GWS user, GitHub account, PAT, 1Password |
 | **2. Infrastructure** | Human (or devops-proxmox-bot) | ~10 min | VM provisioning on Proxmox |
-| **3. Configuration** | Human + Claude Code | ~20 min | Workspace, fleet registry, ArchiMate, deploy |
+| **3. Configuration** | Human + OpenClaw | ~20 min | Workspace, fleet registry, ArchiMate, deploy |
 
 ---
 
@@ -155,20 +155,24 @@ See `docs/1password-entry-standard.md` for the full entry template and `docs/clo
 
 ---
 
-### Step 1.7: Subscribe to Claude Max
+### Step 1.7: Provision API Keys
 
-Claude Code CLI requires subscription auth — an `ANTHROPIC_API_KEY` alone is not sufficient for CLI sessions. Each bot needs its own Claude Max subscription.
+OpenClaw uses 4-tier LLM routing with API keys (no subscription needed per bot).
 
-1. Open an incognito browser window
-2. Log in to [claude.ai](https://claude.ai) as `<role>@bot-fleet.org` (use the Google account created in Step 1.1)
-3. Subscribe to **Claude Max** ($100/month)
-4. Verify subscription is active at [claude.ai/settings](https://claude.ai/settings)
+1. **Gemini API key** (per-bot, free tier):
+   - Go to [Google AI Studio](https://aistudio.google.com/apikey) logged in as `<role>@bot-fleet.org`
+   - Create an API key
+   - Store in 1Password as `Gemini API Key — <bot-name>`
 
-Authentication on the VM happens during deployment (Step 4b in `docs/deployment-runbook.md`) using `claude auth login` with browser-based OAuth.
+2. **OpenClaw hook token** (per-bot):
+   - Generate a random token: `openssl rand -hex 32`
+   - Store in 1Password as `OpenClaw Hook Token — <bot-name>`
 
-> **Cost**: $100/month per bot. Only subscribe when the bot is ready for deployment — not during identity provisioning. See `docs/br-playbook.md` for the full onboarding lifecycle.
+3. **Anthropic API key** (shared across fleet):
+   - Already exists: `Anthropic API Key — Botfleet` in 1Password
+   - Used for Claude Sonnet/Opus escalation (pay-as-you-go)
 
-> **Critical env var**: The bot's env file must use `ANTHROPIC_INFERENCE_KEY` (not `ANTHROPIC_API_KEY`) for the shared Anthropic key. If `ANTHROPIC_API_KEY` is set, Claude Code ignores the Max subscription and charges the API key instead.
+> **Cost**: Gemini Flash free tier covers most bot tasks. Anthropic API is pay-as-you-go, shared across all bots. No per-bot subscription needed.
 
 ---
 
@@ -223,7 +227,7 @@ This creates `bots/<bot-name>/` with:
 - `HEARTBEAT.md` — periodic task schedule
 - `MEMORY.md` — long-term memory (initially empty)
 - `memory/` — daily log directory
-- `.claude/CLAUDE.md` — Claude Code instructions
+- `.claude/CLAUDE.md` — Agent instructions (legacy)
 
 ### Step 3.2: Customise Bot Identity Files
 

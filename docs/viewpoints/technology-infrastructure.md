@@ -85,7 +85,7 @@
 | `sw-ollama` | SystemSoftware | `ollama-server` | Ollama serving on port 11434 |
 | `sw-cloudflared` | SystemSoftware | `cloudflared-daemon` | Cloudflare Tunnel daemon |
 | `sw-proxmox` | SystemSoftware | `proxmox-ve-8` | Proxmox Virtual Environment hypervisor |
-| `sw-claude-code` | SystemSoftware | `claude-code-cli` | Claude Code CLI for bot runtime |
+| `sw-openclaw` | SystemSoftware | `openclaw` | OpenClaw model-agnostic agent runtime |
 | `sw-node-exporter` | SystemSoftware | `prometheus-node-exporter` | Metrics export for monitoring |
 | `sw-fail2ban` | SystemSoftware | `fail2ban` | SSH brute-force protection |
 
@@ -134,7 +134,7 @@
 
 | Source | Target | Description |
 |--------|--------|-------------|
-| `node-archi-01` | `sw-ubuntu`, `sw-claude-code`, `sw-node-exporter`, `sw-fail2ban` | Bot VM runs standard software stack |
+| `node-archi-01` | `sw-ubuntu`, `sw-openclaw`, `sw-node-exporter`, `sw-fail2ban` | Bot VM runs standard software stack |
 | `node-llm-01` | `sw-ubuntu`, `sw-vllm`, `sw-ollama` | LLM VM runs inference software |
 | `node-tunnel-01` | `sw-ubuntu`, `sw-cloudflared` | Tunnel VM runs cloudflared daemon |
 | `dev-a10` | `node-llm-01` | GPU assigned to LLM inference VM via PCI passthrough |

@@ -61,12 +61,12 @@ Curated facts all bots should know. Updated by any bot when fleet-level knowledg
 
 | Complexity | Model | Endpoint | Auth |
 |------------|-------|----------|------|
-| Low (triage, classify) | Local LLM | http://172.16.11.10:8000 | None (VLAN-isolated) |
-| Medium (analysis, review) | Claude Sonnet | Claude Code CLI (primary) | Claude Max setup-token |
-| High (complex reasoning) | Claude Opus | Claude Code CLI | Claude Max setup-token |
-| Direct API calls | Claude Sonnet/Opus | Anthropic API | ANTHROPIC_API_KEY |
+| Low (triage, classify) | Local LLM | http://172.16.11.10:11434 (Ollama) | None (VLAN-isolated) |
+| Medium (dispatch, chat) | Gemini 2.5 Flash | Google AI API (free tier) | GEMINI_API_KEY (per-bot) |
+| High (analysis, review) | Claude Sonnet | Anthropic API | ANTHROPIC_API_KEY (shared) |
+| Critical (complex reasoning) | Claude Opus | Anthropic API | ANTHROPIC_API_KEY (shared) |
 
-> **Note**: The Claude Code CLI (powered by Claude Max subscription) is the primary interface for bot reasoning. Direct Anthropic API calls are used for sub-agent tasks like local inference routing. The local LLM handles cheap classification to reduce Claude Max usage.
+> **Note**: OpenClaw (model-agnostic agent runtime) routes to the right model per task complexity. Gemini Flash free tier handles most bot tasks. Anthropic API is pay-as-you-go, shared across all bots. See ADR-003 in bot-fleet-continuum for the full decision record.
 
 ## Key Standards
 
@@ -103,12 +103,15 @@ Curated facts all bots should know. Updated by any bot when fleet-level knowledg
 ## Credentials
 
 - **Canonical reference**: `docs/cloudflare-credentials.md` — full token inventory, naming conventions, rotation procedures
-- **Claude Max**: Each bot has its own Claude Max subscription ($100/mo) via its Google account — provides CLI auth via OAuth
-  - Auth on VM: `claude auth login --email <role>@bot-fleet.org` (browser OAuth, use SSH port forwarding for headless VMs)
-  - Claude Max is required for Claude Code CLI sessions; `ANTHROPIC_API_KEY` alone is not sufficient for CLI use
-  - **Critical**: `ANTHROPIC_API_KEY` must NOT be set in the bot's environment — if present, Claude Code uses the API key instead of the subscription. Use `ANTHROPIC_INFERENCE_KEY` for the shared key.
+- **OpenClaw runtime**: All bots use OpenClaw as their agent runtime — config in `.openclaw/openclaw.json`
+  - 4-tier LLM routing: Local LLM (Ollama, free) → Gemini Flash (free tier) → Claude Sonnet (API) → Claude Opus (API)
+  - No per-bot subscription needed — Gemini free tier + shared Anthropic API key
+  - Per-bot keys: `GEMINI_API_KEY` (per-bot, free tier), `OPENCLAW_HOOK_TOKEN` (per-bot, gateway auth)
+  - Shared key: `ANTHROPIC_API_KEY` (pay-as-you-go, used for Claude Sonnet/Opus escalation)
 - **GitHub PATs**: `GitHub PAT — <bot-name>`, classic PAT (`repo` + `read:org`), 90-day expiry, stored in 1Password vault "Bot Fleet Vault"
-- **Anthropic API key**: `Anthropic API Key — Botfleet`, shared across all bots, injected to VMs at `/opt/bot/secrets/<bot-name>.env` — used for direct API calls and local inference routing, not for CLI auth
+- **Anthropic API key**: `Anthropic API Key — Botfleet`, shared across all bots, injected to VMs at `/opt/bot/secrets/<bot-name>.env` — used for Claude Sonnet/Opus escalation via OpenClaw
+- **Gemini API key**: `Gemini API Key — <bot-name>`, per-bot, stored in 1Password vault "Bot Fleet Vault"
+- **OpenClaw hook token**: `OpenClaw Hook Token — <bot-name>`, per-bot random token for gateway auth, stored in 1Password vault "Bot Fleet Vault"
 - **Email Worker token**: `Cloudflare Bearer Token — Botfleet Email Worker`, stored in 1Password vault "Bot Fleet Vault"
 - **Chat Worker token**: `Cloudflare Bearer Token — Botfleet Chat Worker`, stored in 1Password vault "Bot Fleet Vault"
 - **Cloudflare API tokens**: Only human + devops-cloudflare-bot have CF API tokens; all other bots use worker bearer tokens

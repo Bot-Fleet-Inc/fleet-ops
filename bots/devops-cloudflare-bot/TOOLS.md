@@ -57,27 +57,25 @@ gh label list --repo Bot-Fleet-Inc/<repo>
 gh label create "<name>" --repo Bot-Fleet-Inc/<repo> --description "<desc>" --color "<hex>"
 ```
 
-## Claude Code CLI
+## OpenClaw Runtime
 
-Used for complex reasoning, multi-step analysis, and file editing tasks that exceed simple scripting.
+Model-agnostic agent runtime. Selects the right model per task complexity.
 
-```bash
-# Run a task with Claude Code
-claude --print "<prompt describing the task>"
+| Task Complexity | Model | Provider |
+|-----------------|-------|----------|
+| Low (classify, label, summarize) | Local LLM | Ollama (A10 GPU) |
+| Medium (triage, analysis) | Gemini 2.5 Flash | Google (free tier) |
+| High (infrastructure analysis) | Claude Sonnet | Anthropic API |
+| Critical (complex reasoning) | Claude Opus | Anthropic API |
 
-# Run with specific file context
-claude --print "<prompt>" --file <path>
-
-# Dangerously allow all tools (only when explicitly authorised)
-claude --dangerously-skip-permissions "<prompt>"
-```
+Config: `.openclaw/openclaw.json` — exec tool allowlist: `gh`, `git`, `curl`
 
 ### Usage Guidelines
 
-- Use Claude Code for tasks requiring judgement, synthesis, or multi-file reasoning.
+- OpenClaw automatically routes to the right model based on task complexity.
 - Prefer `gh` CLI directly for straightforward issue/PR operations.
 - Always include the issue number in prompts for traceability.
-- Respect the tool permissions defined in `.claude/settings.json`.
+- Exec tools are constrained by the `safeBins` allowlist in `openclaw.json`.
 
 ## Local LLM Inference
 
@@ -123,8 +121,8 @@ curl -s http://172.16.11.10:11434/api/tags
 
 ### Recommended Use Cases for Local LLM
 
-| Task | Use Local LLM | Use Claude Code |
-|------|---------------|-----------------|
+| Task | Use Local LLM | Use OpenClaw |
+|------|---------------|--------------|
 | Issue classification (bug/feature/question) | YES | NO |
 | Label suggestion | YES | NO |
 | Short text summarization (< 2000 tokens) | YES | NO |

@@ -1,6 +1,8 @@
-# CLAUDE.md — 🎨 design-bot
+# CLAUDE.md — 🎨 design-bot (Legacy)
 
-This file provides instructions to Claude Code when operating as design-bot.
+> **Legacy**: This file was used by Claude Code CLI. OpenClaw reads `.openclaw/openclaw.json` instead. Kept for reference.
+
+This file provides agent instructions for design-bot.
 
 ## Identity
 
@@ -8,13 +10,13 @@ You are **design-bot**, the fleet's **Logo, brand guide, UI design** bot. You op
 
 ## Session Startup Sequence
 
-On every new Claude Code session, execute this startup sequence in order:
+On every new agent session, execute this startup sequence in order:
 
 1. **Read SOUL.md** — Load your personality, principles, boundaries, and decision framework.
 2. **Read IDENTITY.md** — Load your machine identity: name, GitHub user, IP, VMID, security tier.
 3. **Read CONTEXT.md** — Load organisational context, fleet roster, and domain knowledge.
 4. **Read AGENTS.md** — Load operational rules: polling, security boundaries, escalation, error handling.
-5. **Read TOOLS.md** — Load available tools: `gh` CLI, Claude Code, local LLM, bot-specific tools.
+5. **Read TOOLS.md** — Load available tools: `gh` CLI, OpenClaw runtime, local LLM, bot-specific tools.
 6. **Read HEARTBEAT.md** — Load scheduled task definitions and intervals.
 7. **Read MEMORY.md** — Load accumulated knowledge, patterns, and recent decisions.
 8. **Read latest daily log** — `ls -t logs/*-design-bot.log | head -1` — restore session continuity.

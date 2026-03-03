@@ -158,7 +158,7 @@ Each VM type gets a specific Cloud-Init application template. Full templates and
 | Template | VMs | Key Packages |
 |----------|-----|-------------|
 | [`cloudflare-tunnel.yaml`](../cloudinit/cloudflare-tunnel.yaml) | 400 | `cloudflared` |
-| [`bot-standard.yaml`](../cloudinit/bot-standard.yaml) | 411-413, 415, 421, 423 | `python3`, `nodejs`, `claude-code`, `gh` |
+| [`bot-standard.yaml`](../cloudinit/bot-standard.yaml) | 411-413, 415, 421, 423 | `python3`, `nodejs`, `openclaw`, `gh` |
 | [`bot-coding.yaml`](../cloudinit/bot-coding.yaml) | 414 | Standard + `docker`, `build-essential`, `typescript` |
 | [`bot-infra.yaml`](../cloudinit/bot-infra.yaml) | 420, 422 | Standard + `ansible`, `terraform`, `proxmoxer` |
 | [`llm-inference.yaml`](../cloudinit/llm-inference.yaml) | 450 | `nvidia-driver-550`, `vllm`, `ollama` |

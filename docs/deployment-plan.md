@@ -35,7 +35,7 @@ shared/config/workspace-template/
   MEMORY.md.template        # Empty starter with section headers
   README.md.template        # Deployment/respawn runbook
   .claude/
-    CLAUDE.md.template      # Claude Code project instructions + session startup sequence
+    CLAUDE.md.template      # Agent instructions (legacy) + session startup sequence
     settings.json.template  # Tool permissions per security tier
   memory/.gitkeep
   .gitignore                # Exclude .env, secrets, __pycache__, node_modules
@@ -59,7 +59,7 @@ shared/config/workspace-template/
 
 ### 1.3 systemd Units (`shared/config/systemd/`)
 
-- `bot@.service` — Template unit: long-running Claude Code session with hybrid model routing, auto-restart on failure, env file per bot
+- `bot@.service` — Template unit: long-running OpenClaw agent session with hybrid model routing, auto-restart on failure, env file per bot
 - `bot-backup.timer` + `bot-backup.service` — Nightly 02:00 UTC workspace commit
 
 ### 1.4 Issue Templates (`templates/`)
@@ -137,11 +137,11 @@ All files created in `bots/archi-bot/`:
 | IDENTITY.md | VM 412, IP 172.16.10.22, botfleet-archi, DMZ tier |
 | AGENTS.md | Issue polling, security boundaries, escalation rules, session lifecycle |
 | CONTEXT.md | ArchiMate domain knowledge, fleet members, infrastructure context |
-| TOOLS.md | gh CLI, Claude Code, local LLM, ea-core-archimate, ea-core-advisor |
+| TOOLS.md | gh CLI, OpenClaw runtime, local LLM, ea-core-archimate, ea-core-advisor |
 | HEARTBEAT.md | 60s issue poll, 5min health, hourly PR review, daily curation |
 | MEMORY.md | Empty starter with section headers |
 | README.md | Deployment runbook, respawn procedure, troubleshooting |
-| .claude/CLAUDE.md | Session startup sequence, main loop, communication format |
+| .claude/CLAUDE.md | Agent instructions (legacy), main loop, communication format |
 | .claude/settings.json | Tool permissions for DMZ tier |
 | memory/.gitkeep | Preserve memory directory |
 
@@ -230,7 +230,7 @@ Each bot runs a long-running session that routes between models:
 | Summarization, daily log | Local LLM | `http://172.16.11.10:8000` | Bulk text, cost-sensitive |
 | Code review, architecture | Claude API (Sonnet/Opus) | Cloud | Needs strong reasoning |
 | Complex multi-step tasks | Claude API (Opus) | Cloud | Highest capability needed |
-| Tool use, file editing | Claude Code CLI | Cloud | Full tool access |
+| Tool use, file editing | OpenClaw Runtime | Cloud/Local | 4-tier routing via openclaw.json |
 
 ### 6.2 Implementation
 
@@ -239,7 +239,7 @@ The `shared/inference/client.py` library provides a unified interface:
 - Falls back to Claude API if local LLM is unreachable
 - Logs model usage for cost tracking
 
-The main bot loop (Claude Code session) can shell out to the local LLM for lightweight tasks, reserving its own Claude API context for complex reasoning.
+The main bot loop (OpenClaw agent session) can shell out to the local LLM for lightweight tasks, reserving Claude API context for complex reasoning.
 
 ---
 

@@ -11,7 +11,7 @@
 #   423 — CRM Bot (172.16.10.33)
 # Resources: 2 vCPU / 4 GB RAM / 64 GB disk
 # VLAN: 1010
-# Purpose: Python/Node.js bot runtime with Claude Code CLI
+# Purpose: Python/Node.js bot runtime with OpenClaw agent runtime
 #
 # Merged with global-admins.yaml by deploy pipeline.
 # Post-deploy: connect 1Password service account for secret retrieval.
@@ -86,7 +86,7 @@ write_files:
       echo "=== Bot Runtime ==="
       node --version 2>/dev/null && echo "Node.js: $(node --version)" || echo "Node.js: not installed"
       python3 --version 2>/dev/null && echo "Python: $(python3 --version)" || echo "Python: not installed"
-      claude --version 2>/dev/null && echo "Claude Code: $(claude --version)" || echo "Claude Code: not installed"
+      openclaw --version 2>/dev/null && echo "OpenClaw: $(openclaw --version)" || echo "OpenClaw: not installed"
       echo ""
       echo "=== Services ==="
       systemctl is-active prometheus-node-exporter && echo "node-exporter: active" || echo "node-exporter: inactive"
@@ -97,7 +97,7 @@ write_files:
     content: |
       ┌─────────────────────────────────────────┐
       │  Vennelsborg Bot Fleet — Standard Bot    │
-      │  VLAN 1010 · Python / Node.js / Claude   │
+      │  VLAN 1010 · Python / Node.js / OpenClaw  │
       │  Run `sysinfo` for system status         │
       └─────────────────────────────────────────┘
     permissions: "0644"
@@ -120,7 +120,7 @@ write_files:
       ## Runtime
       - Python 3 with pip, venv, poetry
       - Node.js 20 LTS with npm
-      - Claude Code CLI (`claude`)
+      - OpenClaw agent runtime (`openclaw`)
       - GitHub CLI (`gh`)
     permissions: "0644"
 
@@ -129,8 +129,8 @@ runcmd:
   - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   - apt-get install -y nodejs
 
-  # Install Claude Code CLI
-  - npm install -g @anthropic-ai/claude-code
+  # Install OpenClaw agent runtime
+  - npm install -g openclaw
 
   # Install Python dev tools
   - pip3 install --break-system-packages virtualenv poetry

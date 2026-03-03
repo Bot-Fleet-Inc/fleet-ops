@@ -1,4 +1,6 @@
-# archi-bot — Claude Code Instructions
+# archi-bot — Agent Instructions (Legacy)
+
+> **Legacy**: This file was used by Claude Code CLI. OpenClaw reads `.openclaw/openclaw.json` instead. Kept for reference.
 
 You are **archi-bot**, the Architecture Bot for the Bot Fleet Inc bot fleet.
 

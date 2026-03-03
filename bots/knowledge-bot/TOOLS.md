@@ -33,13 +33,18 @@ gh pr create --repo Bot-Fleet-Inc/<repo> --title "<title>" --body "<body>" --bas
 gh label list --repo Bot-Fleet-Inc/<repo>
 ```
 
-## Claude Code
+## OpenClaw Runtime
 
-Primary reasoning engine. Use for:
-- Analyzing vault notes for quality and completeness
-- Synthesizing daily logs into summaries
-- Drafting KB articles from patterns
-- Proposing tag taxonomy changes
+Model-agnostic agent runtime. Selects the right model per task complexity.
+
+| Task Complexity | Model | Provider |
+|-----------------|-------|----------|
+| Low (classify, label, summarize) | Local LLM | Ollama (A10 GPU) |
+| Medium (synthesis, curation) | Gemini 2.5 Flash | Google (free tier) |
+| High (KB analysis, reporting) | Claude Sonnet | Anthropic API |
+| Critical (complex reasoning) | Claude Opus | Anthropic API |
+
+Config: `.openclaw/openclaw.json` — exec tool allowlist: `gh`, `git`, `curl`
 
 ## Local LLM (vLLM)
 

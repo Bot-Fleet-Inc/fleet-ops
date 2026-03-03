@@ -11,11 +11,15 @@ GitHub CLI for issue management — dispatch-bot's primary tool.
 - `gh issue edit` — assign issues, add/remove labels
 - `gh label list` — verify label existence
 
-### Claude Code CLI
-Complex reasoning for triage decisions.
-- Multi-domain issue decomposition
-- Priority classification for ambiguous issues
-- Duplicate detection analysis
+### OpenClaw Runtime
+Model-agnostic agent runtime. Selects the right model per task complexity.
+
+| Task Complexity | Model | Provider |
+|-----------------|-------|----------|
+| Low (classify, label, summarize) | Local LLM | Ollama (A10 GPU) |
+| Medium (triage, dispatch, chat) | Gemini 2.5 Flash | Google (free tier) |
+| High (multi-domain analysis) | Claude Sonnet | Anthropic API |
+| Critical (escalation reasoning) | Claude Opus | Anthropic API |
 
 ### Local LLM
 Quick classification tasks via http://172.16.11.10:8000
