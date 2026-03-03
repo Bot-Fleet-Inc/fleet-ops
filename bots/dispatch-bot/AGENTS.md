@@ -49,26 +49,59 @@ Create a `status:needs-human` escalation issue when:
 
 ## Session Lifecycle
 
-### Startup
-1. Read SOUL.md — load personality and principles
+### Startup Sequence
+1. Read SOUL.md — load personality, principles, dialogue patterns
 2. Read IDENTITY.md — load machine identity
-3. Read CONTEXT.md — load domain knowledge
+3. Read CONTEXT.md — load organisation and fleet context
 4. Read AGENTS.md — load operational config (this file)
-5. Read TOOLS.md — load available tools
+5. Read TOOLS.md — load available tools and usage patterns
 6. Read HEARTBEAT.md — load periodic task schedule
-7. Read MEMORY.md — load long-term memory
-8. Read latest daily log from memory/ — load recent context
-9. Begin main issue processing loop
+7. Read MEMORY.md — load curated long-term memory
+8. Read latest file in `memory/` directory — load recent session context
+9. Verify connectivity: GitHub API, Chat Worker, Local LLM
+10. Begin main loop
 
 ### Main Loop
-1. Poll for assigned and unassigned issues (60s interval)
-2. For each unassigned issue: classify, assign to specialist bot, set labels
-3. For each assigned-to-self issue: process dispatch tasks (token tracking, stale detection)
-4. Between polls: execute heartbeat tasks if due
-5. Log all actions to daily log
+
+Every 60 seconds:
+1. `gh issue list --assignee=botfleet-dispatch --state=open` — process assigned issues
+2. `gh issue list --no-assignee --state=open` — triage unassigned issues
+3. For each unassigned issue: classify → assign to specialist bot → set labels → comment
+4. For each assigned-to-self issue: process dispatch tasks (token tracking, stale detection)
+5. Poll Chat Worker inbox: `GET /api/inbox?bot=dispatch-bot&since=<last-poll-ts>`
+6. Process chat messages: respond, create issues from requests, clarify ambiguity
+7. Run heartbeat tasks if due (see HEARTBEAT.md schedule)
+8. Write actions to daily log (`memory/YYYY-MM-DD.md`)
+
+### Memory Persistence
+
+- **During session**: Write observations, decisions, and patterns to `memory/YYYY-MM-DD.md`
+- **Nightly (02:00 UTC)**: Curate MEMORY.md from daily logs — promote recurring patterns, prune stale entries
+- **On restart**: Read MEMORY.md + latest daily log to restore context
+- **Before context compression**: When context window is getting full, flush important working state to daily log
+
+### Context Recovery
+
+When the Claude Code context window compresses (messages are summarised):
+
+1. **Don't panic** — this is expected during long-running sessions
+2. Read `bots/dispatch-bot/MEMORY.md` — curated long-term facts
+3. Read latest file in `memory/` — recent session context
+4. Read `bots/dispatch-bot/SOUL.md` — re-anchor personality and principles
+5. Read `bots/dispatch-bot/AGENTS.md` — re-load operational config
+6. Resume main loop from the last known state
+7. **Never ask the human to repeat** — the answer is in the memory files
+
+### Memory Flush Trigger
+
+Before context compression becomes critical:
+1. Write a session summary to the daily log: what was in progress, pending decisions, key observations
+2. Commit the daily log to git: `git add memory/ && git commit -m "memory: flush before context compression"`
+3. This ensures no working context is lost when the window compresses
 
 ### Graceful Shutdown
 1. Finish current issue processing (if in progress)
 2. Write session summary to daily log
-3. Commit any uncommitted changes
-4. Exit cleanly
+3. Commit any uncommitted changes (`git add . && git commit -m "memory: session end"`)
+4. Push to remote (`git push`)
+5. Exit cleanly

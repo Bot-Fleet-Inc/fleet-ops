@@ -59,11 +59,14 @@ Curated facts all bots should know. Updated by any bot when fleet-level knowledg
 
 ## LLM Routing
 
-| Complexity | Model | Endpoint |
-|------------|-------|----------|
-| Low (triage, classify) | Local LLM | http://172.16.11.10:8000 |
-| Medium (analysis, review) | Claude Sonnet | Anthropic API |
-| High (complex reasoning) | Claude Opus | Anthropic API |
+| Complexity | Model | Endpoint | Auth |
+|------------|-------|----------|------|
+| Low (triage, classify) | Local LLM | http://172.16.11.10:8000 | None (VLAN-isolated) |
+| Medium (analysis, review) | Claude Sonnet | Claude Code CLI (primary) | Claude Max setup-token |
+| High (complex reasoning) | Claude Opus | Claude Code CLI | Claude Max setup-token |
+| Direct API calls | Claude Sonnet/Opus | Anthropic API | ANTHROPIC_API_KEY |
+
+> **Note**: The Claude Code CLI (powered by Claude Max subscription) is the primary interface for bot reasoning. Direct Anthropic API calls are used for sub-agent tasks like local inference routing. The local LLM handles cheap classification to reduce Claude Max usage.
 
 ## Key Standards
 
@@ -100,8 +103,12 @@ Curated facts all bots should know. Updated by any bot when fleet-level knowledg
 ## Credentials
 
 - **Canonical reference**: `docs/cloudflare-credentials.md` — full token inventory, naming conventions, rotation procedures
+- **Claude Max**: Each bot has its own Claude Max subscription ($100/mo) via its Google account — provides CLI auth via `setup-token`
+  - 1Password item: `Claude Max Setup Token — <bot-name>`
+  - Auth on VM: `claude setup-token <token>` (creates `~/.claude/` config)
+  - Claude Max is required for Claude Code CLI sessions; `ANTHROPIC_API_KEY` alone is not sufficient for CLI use
 - **GitHub PATs**: `GitHub PAT — <bot-name>`, classic PAT (`repo` + `read:org`), 90-day expiry, stored in 1Password vault "Bot Fleet Vault"
-- **Anthropic API key**: `Anthropic API Key — Botfleet`, shared across all bots, injected to VMs at `/opt/bot/secrets/<bot-name>.env`
+- **Anthropic API key**: `Anthropic API Key — Botfleet`, shared across all bots, injected to VMs at `/opt/bot/secrets/<bot-name>.env` — used for direct API calls and local inference routing, not for CLI auth
 - **Email Worker token**: `Cloudflare Bearer Token — Botfleet Email Worker`, stored in 1Password vault "Bot Fleet Vault"
 - **Chat Worker token**: `Cloudflare Bearer Token — Botfleet Chat Worker`, stored in 1Password vault "Bot Fleet Vault"
 - **Cloudflare API tokens**: Only human + devops-cloudflare-bot have CF API tokens; all other bots use worker bearer tokens

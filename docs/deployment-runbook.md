@@ -15,7 +15,8 @@ Before deploying a bot, ensure:
 - [ ] VM has network connectivity on VLAN 1010 (test with `ping 172.16.10.1`)
 - [ ] GitHub machine user account created via Google OAuth (see `docs/bot-provisioning-runbook.md`)
 - [ ] Classic PAT generated with `repo` + `read:org` scopes
-- [ ] Anthropic API key available
+- [ ] **Claude Max subscription** active for the bot's Google account (see Step 4b below)
+- [ ] Claude Code CLI authenticated via `claude setup-token` on the VM
 - [ ] Both tokens stored in 1Password vault "Bot Fleet Vault"
 - [ ] Bot workspace files exist in `bots/<bot-name>/` in the repo
 
@@ -132,6 +133,39 @@ chown bot:bot /opt/bot/secrets/<bot-name>.env
 ```
 
 > **1Password item names**: GitHub PATs are per-bot (`GitHub PAT — archi-bot`, etc.). The Anthropic API key is shared across all bots (`Anthropic API Key — Botfleet`). See `docs/cloudflare-credentials.md` for the full naming convention.
+
+## Step 4b: Authenticate Claude Code CLI (Claude Max)
+
+Claude Code CLI requires subscription auth — `ANTHROPIC_API_KEY` alone is not sufficient for CLI sessions.
+
+### Subscribe to Claude Max
+
+If not already done (see `docs/bot-provisioning-runbook.md` Step 1.7):
+
+1. Log in to [claude.ai](https://claude.ai) as the bot's Google account (`<role>@bot-fleet.org`)
+2. Subscribe to Claude Max ($100/month)
+3. Generate a setup token from **Settings → API / CLI → Setup Token**
+4. Store the token in 1Password: `Claude Max Setup Token — <bot-name>`
+
+### Authenticate on the VM
+
+```bash
+# As the bot user on the VM:
+sudo -u bot /usr/bin/claude setup-token <token-from-1password>
+```
+
+This creates `~/.claude/` auth config for the bot user. The existing systemd unit (`bot@.service`) will use this auth automatically.
+
+### Verify
+
+```bash
+sudo -u bot /usr/bin/claude --version
+sudo -u bot /usr/bin/claude -p "Say hello" --model sonnet
+```
+
+Expected: Claude responds with a greeting. If it errors with an auth message, the setup token is invalid or expired — regenerate from claude.ai.
+
+> **Note**: The `ANTHROPIC_API_KEY` in the env file is still used for direct Anthropic API calls (e.g., shared inference routing). The Claude Max setup token authenticates the Claude Code CLI session specifically.
 
 ## Step 5: Authenticate gh CLI
 
