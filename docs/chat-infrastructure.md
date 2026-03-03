@@ -94,11 +94,29 @@ Human (browser) → chat.bot-fleet.org
     → Worker serves UI + /api/messages endpoints
 
 Bot (curl) → chat.bot-fleet.org/api/inbox*
-  → Zero Trust bypass policy for /api/inbox* path
-    → Worker validates Bearer token
+  → Cloudflare Access service token (CF-Access-Client-Id + CF-Access-Client-Secret)
+    → Worker validates Bearer token (Authorization header)
 ```
 
-**Zero Trust Access** protects the domain. A bypass policy must be configured for `/api/inbox*` so bots can reach the polling endpoints with bearer tokens instead of SSO.
+**Zero Trust Access** protects the domain. Bots authenticate to the Access layer using a shared service token (`Bot Fleet API`), then to the Worker using their bearer token.
+
+### Access Policies (configured 2026-03-03)
+
+| Order | Policy | Action | Rule |
+|-------|--------|--------|------|
+| 1 | Bot API service token | Service Auth | Service Token = `Bot Fleet API` |
+| 2 | Human access | Allow | Email = `jorgen@scheel.no`, `jorgen.scheel@bot-fleet.org` |
+
+### Bot Auth Headers
+
+Bots must send **both** sets of headers:
+
+```bash
+curl -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+     -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+     -H "Authorization: Bearer $CHAT_WORKER_TOKEN" \
+     "https://chat.bot-fleet.org/api/inbox?bot=<name>&since=<ts>"
+```
 
 ---
 
@@ -116,10 +134,11 @@ npx wrangler deploy
 
 ### Post-deploy manual steps
 
-1. Add custom domain `chat.bot-fleet.org` in Cloudflare Workers dashboard (or add CNAME in DNS)
-2. Create Zero Trust Access Application for `chat.bot-fleet.org` with Google Workspace SSO
-3. Add bypass policy for path `/api/inbox*` (so bots can poll with bearer tokens)
+1. ~~Add custom domain `chat.bot-fleet.org` in Cloudflare Workers dashboard~~ — **Done** (2026-03-03)
+2. ~~Create Zero Trust Access Application for `chat.bot-fleet.org` with Google Workspace SSO~~ — **Done** (2026-03-03)
+3. ~~Create service token `Bot Fleet API` and add Service Auth policy~~ — **Done** (2026-03-03)
 4. Store API token in 1Password as "Cloudflare Bearer Token — Botfleet Chat Worker" in vault "Bot Fleet Vault"
+5. Store service token in 1Password as "Cloudflare Service Token — Bot Fleet API" in vault "Bot Fleet Vault"
 
 ---
 
@@ -132,6 +151,7 @@ Vault: **"Bot Fleet Vault"**
 | Item | Type | Contents |
 |------|------|----------|
 | `Cloudflare Bearer Token — Botfleet Chat Worker` | API Credential | Bearer token for Worker REST API |
+| `Cloudflare Service Token — Bot Fleet API` | API Credential | CF-Access-Client-Id + CF-Access-Client-Secret |
 
 ### Retrieving the Token
 
@@ -148,18 +168,22 @@ op read "op://Bot Fleet Vault/Cloudflare Bearer Token - Botfleet Chat Worker/cre
 ### Poll for new messages
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" \
-  "https://chat.bot-fleet.org/api/inbox?bot=archi-bot&since=2026-03-01T00:00:00.000Z"
+curl -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+     -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+     -H "Authorization: Bearer $CHAT_WORKER_TOKEN" \
+     "https://chat.bot-fleet.org/api/inbox?bot=archi-bot&since=2026-03-01T00:00:00.000Z"
 ```
 
 ### Reply to a message
 
 ```bash
 curl -X POST \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"body":"Hello from archi-bot"}' \
-  "https://chat.bot-fleet.org/api/inbox/msg%3Aarchi-bot%3A1709100000000/reply"
+     -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+     -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+     -H "Authorization: Bearer $CHAT_WORKER_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"body":"Hello from archi-bot"}' \
+     "https://chat.bot-fleet.org/api/inbox/msg%3Aarchi-bot%3A1709100000000/reply"
 ```
 
 ---

@@ -27,10 +27,11 @@ Quick classification tasks via http://172.16.11.10:8000
 
 ### Chat Worker
 
-Human-to-bot messaging via Cloudflare Worker + KV.
+Human-to-bot messaging via Cloudflare Worker + KV. Protected by Cloudflare Zero Trust Access.
 
-- **Base URL**: `https://botfleet-chat.bot-fleet-inc.workers.dev`
-- **Auth**: Bearer token (`$CHAT_WORKER_TOKEN`)
+- **Base URL**: `https://chat.bot-fleet.org`
+- **Auth**: Bearer token (`$CHAT_WORKER_TOKEN`) + Cloudflare Access service token
+- **Access headers**: `CF-Access-Client-Id` (`$CF_ACCESS_CLIENT_ID`) and `CF-Access-Client-Secret` (`$CF_ACCESS_CLIENT_SECRET`)
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
@@ -39,15 +40,20 @@ Human-to-bot messaging via Cloudflare Worker + KV.
 
 #### Poll example
 ```bash
-curl -s -H "Authorization: Bearer $CHAT_WORKER_TOKEN" \
-  "https://botfleet-chat.bot-fleet-inc.workers.dev/api/inbox?bot=dispatch-bot&since=$LAST_POLL"
+curl -s \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+  -H "Authorization: Bearer $CHAT_WORKER_TOKEN" \
+  "https://chat.bot-fleet.org/api/inbox?bot=dispatch-bot&since=$LAST_POLL"
 ```
 
 #### Reply example
 ```bash
 curl -s -X POST \
+  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
   -H "Authorization: Bearer $CHAT_WORKER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body":"Acknowledged — creating issue now."}' \
-  "https://botfleet-chat.bot-fleet-inc.workers.dev/api/inbox/$MSG_ID/reply"
+  "https://chat.bot-fleet.org/api/inbox/$MSG_ID/reply"
 ```

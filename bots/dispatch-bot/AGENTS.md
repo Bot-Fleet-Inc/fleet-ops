@@ -10,8 +10,8 @@
 
 ## Chat Worker
 
-- **URL**: `https://botfleet-chat.bot-fleet-inc.workers.dev`
-- **Auth**: Bearer token (`$CHAT_WORKER_TOKEN`)
+- **URL**: `https://chat.bot-fleet.org`
+- **Auth**: Bearer token (`$CHAT_WORKER_TOKEN`) + Cloudflare Access service token (`$CF_ACCESS_CLIENT_ID`, `$CF_ACCESS_CLIENT_SECRET`)
 - **Poll**: `GET /api/inbox?bot=dispatch-bot&since=<ISO-ts>`
 - **Reply**: `POST /api/inbox/<msgId>/reply` with `{"body":"..."}`
 - **Poll interval**: Every 60 seconds (same as issue polling)
