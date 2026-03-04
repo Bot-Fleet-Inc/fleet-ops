@@ -1,0 +1,85 @@
+{
+  // OpenClaw gateway configuration template for Bot Fleet Inc bots.
+  // Template variables: {{BOT_ID}}, {{DISPLAY_NAME}}, {{BOT_DIR}}
+  // Env vars resolved at runtime: ${TELEGRAM_BOT_TOKEN}, ${OPENCLAW_HOOK_TOKEN},
+  //   ${GEMINI_API_KEY}, ${ANTHROPIC_API_KEY}
+  //
+  // Reference: https://github.com/unisone/openclaw-config
+
+  // Agent definitions — one per bot, extensible to multi-agent later
+  "agents": {
+    "list": [
+      {
+        "id": "{{BOT_ID}}",
+        "name": "{{DISPLAY_NAME}}",
+        "default": true,
+        "model": "google/gemini-2.5-flash-preview",
+        "workspace": "/opt/bot/workspace/{{BOT_DIR}}",
+        "agentDir": "/opt/bot/.openclaw/agents/{{BOT_ID}}/agent"
+      }
+    ]
+  },
+
+  // Model providers — cheapest first, escalate when needed
+  "models": {
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://172.16.11.10:11434/v1"
+      },
+      "google": {
+        // Uses GEMINI_API_KEY env var automatically
+      },
+      "anthropic": {
+        // Uses ANTHROPIC_API_KEY env var automatically
+      }
+    }
+  },
+
+  // Gateway — headless server mode
+  "gateway": {
+    "mode": "local",
+    "port": 18789,
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_HOOK_TOKEN}"
+    }
+  },
+
+  // Messaging channels
+  "channels": {
+    "telegram": {
+      "accounts": {
+        "default": {
+          "botToken": "${TELEGRAM_BOT_TOKEN}"
+        }
+      }
+    }
+  },
+
+  // Route inbound channel messages to the default agent
+  "bindings": [
+    { "agentId": "{{BOT_ID}}", "match": { "channel": "telegram" } }
+  ],
+
+  // Exec tool — allowlist for bot operations
+  "tools": {
+    "exec": {
+      "host": "gateway",
+      "security": "allowlist",
+      "ask": "off",
+      "safeBinTrustedDirs": ["/usr/bin", "/usr/local/bin"],
+      "safeBins": ["gh", "git", "curl"]
+    }
+  },
+
+  // Memory — semantic search via Gemini embeddings
+  "memory": {
+    "enabled": true,
+    "embeddingProvider": "google"
+  },
+
+  // Skills — loaded from skillset repo
+  "skills": {
+    "path": "/opt/bot/workspace/skillset-{{BOT_DIR}}/skills"
+  }
+}

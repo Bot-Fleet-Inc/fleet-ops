@@ -1,0 +1,77 @@
+// Production Hardening — Bot Fleet Inc
+//
+// Merged into each bot's openclaw.json during deployment.
+// Adapted from https://github.com/unisone/openclaw-config (production-hardening/).
+//
+// Key improvements over defaults:
+//   - Crash recovery: 5s flat (vs 10s–5min default)
+//   - Config rollback: 10s (vs 30+ min default)
+//   - Disk usage (1yr): ~30MB (vs ~300MB default)
+//   - Context overflow prevention for heavy tool use
+
+{
+  agents: {
+    defaults: {
+      // Compaction: summarise older conversation when context fills up
+      compaction: {
+        mode: "safeguard",
+        reserveTokensFloor: 40000,
+        maxHistoryShare: 0.6,
+        memoryFlush: {
+          enabled: true,
+          softThresholdTokens: 120000,
+          prompt: "MEMORY FLUSH: Session approaching compaction. Do these IN ORDER:\n1. UPDATE STATE.md with current working context\n2. THEN write to memory/YYYY-MM-DD.md with session details\n\nSTATE.md is your lifeline after compaction — make it count. Keep it under 3KB.\nIf truly nothing to save, reply NO_REPLY.",
+          systemPrompt: "Pre-compaction memory flush. Update STATE.md FIRST (live working context — what's active, pending, recent decisions). Then write details to memory/YYYY-MM-DD.md. STATE.md survives compaction and gets loaded next session. Keep STATE.md under 3KB."
+        }
+      },
+
+      // Context pruning: trim old tool results from in-memory context
+      contextPruning: {
+        mode: "cache-ttl",
+        ttl: "5m",
+        keepLastAssistants: 5,
+        softTrimRatio: 0.3,
+        hardClearRatio: 0.3,
+        minPrunableToolChars: 50000,
+        softTrim: {
+          maxChars: 4000,
+          headChars: 750,
+          tailChars: 750
+        },
+        hardClear: {
+          enabled: true,
+          placeholder: "[Cleared — re-run tool if needed]"
+        }
+      }
+    }
+  },
+
+  // Model fallbacks — fleet-specific tier order
+  // Primary: Gemini Flash (free) → Sonnet (paid) → Opus (paid)
+  // Override per-bot in openclaw.json if needed.
+  models: {
+    fallbacks: [
+      "google/gemini-2.5-flash-preview",
+      "anthropic/claude-sonnet-4-5",
+      "anthropic/claude-opus-4-5"
+    ]
+  },
+
+  // Feature unlocks — stable features enabled for all fleet bots
+  features: {
+    // Typing indicators in Telegram
+    typingIndicators: true,
+
+    // Heartbeat checks during active hours (UTC)
+    heartbeat: {
+      enabled: true,
+      intervalMinutes: 30
+    },
+
+    // Gateway hot-reload — pick up config changes without restart
+    hotReload: {
+      enabled: true,
+      debounceMs: 2000
+    }
+  }
+}
