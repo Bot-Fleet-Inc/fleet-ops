@@ -101,13 +101,12 @@ export default async function run({ exec, log }) {
           ]);
 
           result.assigned++;
+          result.triaged++;
           log(`Assigned ${repo}#${issue.number} → ${mapping.bot} (${domain})`);
         } catch (err) {
           result.errors.push(`Failed to assign ${repo}#${issue.number}: ${err.message}`);
           log(`Error assigning ${repo}#${issue.number}: ${err.message}`, "error");
         }
-
-        result.triaged++;
       }
     } catch (err) {
       result.errors.push(`Failed to query ${org}: ${err.message}`);

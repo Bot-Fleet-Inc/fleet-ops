@@ -5,6 +5,8 @@ Wants=network-online.target
 Documentation=https://github.com/Bot-Fleet-Inc/fleet-ops
 StartLimitBurst=5
 StartLimitIntervalSec=600
+# Faster crash recovery (from openclaw-config production hardening)
+ThrottleInterval=5
 
 [Service]
 Type=simple
@@ -13,14 +15,10 @@ Group=bot
 WorkingDirectory=/opt/bot/workspace/%i
 EnvironmentFile=/opt/bot/secrets/%i.env
 Environment=HOME=/opt/bot
-Environment=OPENCLAW_HOME=/opt/bot/workspace/%i/.openclaw
+Environment=OPENCLAW_HOME=/opt/bot/.openclaw
 ExecStart=/usr/local/bin/openclaw gateway run
 Restart=always
 RestartSec=10
-
-# Faster crash recovery (from openclaw-config production hardening)
-# Default systemd throttle is 10s; 5s reduces downtime on repeated restarts
-ThrottleInterval=5
 
 # Security hardening
 NoNewPrivileges=true

@@ -29,11 +29,11 @@ echo "  VM 411 — $(hostname)"
 echo "========================================="
 echo ""
 
-read -rp "GitHub PAT (botfleet-dispatch): " GITHUB_TOKEN
-read -rp "Anthropic API Key: " ANTHROPIC_KEY
-read -rp "Gemini API Key (dispatch-bot): " GEMINI_KEY
-read -rp "Chat Worker Token (legacy): " CHAT_TOKEN
-read -rp "Telegram Bot Token: " TELEGRAM_TOKEN
+read -rsp "GitHub PAT (botfleet-dispatch): " GITHUB_TOKEN; echo
+read -rsp "Anthropic API Key: " ANTHROPIC_KEY; echo
+read -rsp "Gemini API Key (dispatch-bot): " GEMINI_KEY; echo
+read -rsp "Chat Worker Token (legacy): " CHAT_TOKEN; echo
+read -rsp "Telegram Bot Token: " TELEGRAM_TOKEN; echo
 
 # Generate OpenClaw hook token if not provided
 OPENCLAW_HOOK_TOKEN=$(openssl rand -hex 32)
@@ -184,6 +184,7 @@ Wants=network-online.target
 Documentation=https://github.com/Bot-Fleet-Inc/fleet-ops
 StartLimitBurst=5
 StartLimitIntervalSec=600
+ThrottleInterval=5
 
 [Service]
 Type=simple
@@ -192,11 +193,10 @@ Group=bot
 WorkingDirectory=/opt/bot/workspace/%i
 EnvironmentFile=/opt/bot/secrets/%i.env
 Environment=HOME=/opt/bot
-Environment=OPENCLAW_HOME=/opt/bot/workspace/%i/.openclaw
+Environment=OPENCLAW_HOME=/opt/bot/.openclaw
 ExecStart=/usr/local/bin/openclaw gateway run
 Restart=always
 RestartSec=10
-ThrottleInterval=5
 
 NoNewPrivileges=true
 ProtectSystem=strict

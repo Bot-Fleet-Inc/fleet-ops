@@ -52,8 +52,8 @@
   models: {
     fallbacks: [
       "google/gemini-2.5-flash-preview",
-      "anthropic/claude-sonnet-4-5",
-      "anthropic/claude-opus-4-5"
+      "anthropic/claude-sonnet-4-20250514",
+      "anthropic/claude-opus-4-20250514"
     ]
   },
 
