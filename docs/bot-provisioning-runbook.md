@@ -2,7 +2,7 @@
 
 Step-by-step guide for adding a new bot to the fleet — from identity creation to operational verification.
 
-**Version**: 2.1
+**Version**: 2.2
 **Last Updated**: 2026-03-05
 **Authors**: dispatch-bot (lessons learned: design-bot onboarding)
 
@@ -394,6 +394,7 @@ $SSH "sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1"  # →
 | 9 | Proxmox API 403 | `privsep=1` requires ACL on both user AND token | Verify both `dispatch-bot@pve` and `dispatch-bot@pve!provisioner` have the role |
 | 10 | Bot has no skills | Skillset repo and install step missing from deployment | Phase 3.6 — create `skillset-<bot-name>` repo and install before starting service |
 | 11 | Workspace not backed up | git remote and backup timer not configured | Phase 3.7 — set git remote + enable `bot-backup@<bot-name>.timer` |
+| 12 | `sharp` image optimizer fails / Telegram images broken | Template 9000 uses `kvm64` (x86-64 v1) — lacks AVX/SSE4 required by sharp prebuilt binaries | Set CPU type to `host` on template 9000 and all bot VMs (Proxmox UI → Hardware → Processors) — reboot required |
 
 ---
 
