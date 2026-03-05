@@ -2,318 +2,465 @@
 
 Step-by-step guide for adding a new bot to the fleet — from identity creation to operational verification.
 
-**Version**: 1.2
+**Version**: 2.0
 **Last Updated**: 2026-03-05
+**Authors**: dispatch-bot (lessons learned: design-bot onboarding)
 
 ---
 
 ## Overview
 
-Adding a new bot requires three phases:
+| Phase | Owner | Duration | Autonomous? |
+|-------|-------|----------|-------------|
+| **1. Identity** | Human (Jørgen) | ~10 min | ❌ Requires human |
+| **2. Infrastructure** | dispatch-bot | ~3 min | ✅ Proxmox API |
+| **3. Configuration & Deploy** | dispatch-bot | ~15 min | ✅ Fully autonomous |
+| **4. Post-provisioning** | dispatch-bot | ~5 min | ✅ Fully autonomous |
 
-| Phase | Owner | Duration | Steps |
-|-------|-------|----------|-------|
-| **1. Identity** | Human | ~10 min | GWS user, GitHub account, PAT |
-| **2. Infrastructure** | Human (or devops-proxmox-bot) | ~10 min | VM provisioning on Proxmox |
-| **3. Configuration** | dispatch-bot + Human | ~20 min | Workspace, fleet registry, ArchiMate, deploy |
-
-> **Secrets**: dispatch-bot is the sole gateway to the Bot Fleet Vault (1Password). Credential storage and injection is handled by dispatch-bot during Phase 3 — not a human task during Phase 1. See `docs/1password-entry-standard.md` for the naming convention dispatch-bot follows when storing credentials.
-
-> **Per-bot vaults**: Some bots (e.g. audit-bot) may require a dedicated 1Password vault and service account for their own secret access. This is evaluated during each bot's onboarding and noted in the onboarding epic if applicable.
+> **Secrets**: dispatch-bot is the sole gateway to the Bot Fleet Vault (1Password). All credential storage and injection is handled by dispatch-bot — not a human task after Phase 1.
 
 ---
 
 ## Prerequisites
 
-Before starting, determine:
+Decide these values before creating the onboarding epic:
 
 | Decision | Convention | Example |
 |----------|-----------|---------|
-| **Bot name** | `<function>-bot` | `analytics-bot` |
-| **GitHub user** | `botfleet-<short-role>` | `botfleet-analytics` |
-| **Email** | `<role>@bot-fleet.org` | `analytics@bot-fleet.org` |
-| **VMID** | 410–419 (core), 420–429 (devops/infra) | `417` |
-| **IP** | `172.16.10.<VMID - 390>` (core) or `172.16.10.<VMID - 390>` (devops) | `172.16.10.27` |
-| **Security tier** | DMZ / Infra-Access / Air-Gapped | `DMZ` |
-| **Role category** | Core / DevOps / Specialist | `Specialist` |
-| **Emoji** | One emoji for issue comments | `📈` |
-| **Milestone** | Which milestone this bot ships in | `M2` |
-| **Default model** | Primary LLM for this bot | `Claude Sonnet 4.6 / OAuth` |
-| **Model rationale** | Why this tier | e.g. "lightweight triage — Gemini Flash sufficient" |
+| Bot name | `<function>-bot` | `coding-bot` |
+| GitHub user | `botfleet-<short-role>` | `botfleet-coding` |
+| Email | `<role>@bot-fleet.org` | `coding@bot-fleet.org` |
+| VMID | 410–419 (core), 420–429 (devops) | `417` |
+| IP | `172.16.10.<VMID - 390>` | `172.16.10.27` |
+| Security tier | DMZ / Infra-Access / Air-Gapped | `DMZ` |
+| Default model | Primary LLM | `Claude Sonnet 4.6 / OAuth` |
+| Emoji | For issue comments | `💻` |
 
-
-### Model Hierarchy
-
-Define the bot's LLM tier **before** provisioning — it affects the OpenClaw config template substitution and cost planning.
-
-**Default hierarchy (all bots unless overridden):**
+### Model Hierarchy (all bots unless overridden)
 
 | Priority | Model | Auth | When |
 |----------|-------|------|------|
-| 1st | Claude Sonnet 4.6 | OAuth (Max sub) | Default — daily work |
-| 2nd | Claude Sonnet 4.6 | API key | OAuth limit fallback → notify dispatch-bot |
+| 1st | Claude Sonnet 4.6 | OAuth (Max sub) | Default |
+| 2nd | Claude Sonnet 4.6 | API key | OAuth limit hit → alert dispatch-bot |
 | 3rd | Gemini 2.5 Flash | API key | Last resort |
 
-**Override examples:**
+### VMID / IP Allocation
 
-| Bot type | Suggested default | Rationale |
-|----------|-------------------|-----------|
-| Lightweight (triage, labelling) | Gemini 2.5 Flash | Simple tasks, free tier, low cost |
-| Standard specialist | Claude Sonnet 4.6 / OAuth | Good reasoning, covered by Max sub |
-| Architecture / complex reasoning | Claude Opus 4.6 / OAuth | Needs stronger model for EA work |
-| Cost-sensitive high-volume | Gemini 2.5 Flash + Sonnet fallback | Volume over quality |
+| Range | Purpose | Current |
+|-------|---------|---------|
+| 410–419 | Core + Specialist bots | 411–416 allocated |
+| 420–429 | DevOps / Infra bots | 420–423 allocated |
 
-Document the decision in the onboarding epic issue and in the bot's `AGENTS.md` under **Model Routing**.
-
-### VMID Allocation Scheme
-
-| Range | Purpose | Current Usage |
-|-------|---------|---------------|
-| 400 | Cloudflare Tunnel | Allocated |
-| 410–419 | Core + Specialist bots | 411–416 allocated, 410/417–419 available |
-| 420–429 | DevOps / Infra-Access bots | 420–423 allocated, 424–429 available |
-| 450 | LLM Inference | Allocated |
-
-### IP Allocation Scheme
-
-VLAN 1010 (`172.16.10.0/24`):
-
-| Range | Purpose |
-|-------|---------|
-| .1 | Gateway |
-| .2 | Proxmox temp bridge IP (SSH jump) |
-| .10 | Cloudflare Tunnel |
-| .20–.29 | Core + Specialist bots (VMID 410–419 maps to .20–.29) |
-| .30–.39 | DevOps bots (VMID 420–429 maps to .30–.39) |
+IP maps directly: VMID 416 → `172.16.10.26` (VMID − 390 = last octet)
 
 ---
 
 ## Phase 1: Identity Provisioning (Human)
 
-### Step 1.1: Create Google Workspace User
+> Human completes all steps in one sitting. Hand all credentials to dispatch-bot at the end.
 
-1. Log in to [Google Admin Console](https://admin.google.com) as `jorgen@bot-fleet.org`
-2. Navigate to **Directory → Users → Add new user**
-3. Fill in:
-   - First name: `<Bot Display Name>` (e.g., "Analytics Bot")
-   - Last name: `Bot Fleet`
-   - Primary email: `<role>@bot-fleet.org`
-   - Password: Generate a temporary password
-4. Skip recovery email/phone (machine account)
+### 1.1 — Google Workspace User
 
-> **Audit note**: audit-bot periodically verifies GWS user list matches fleet roster.
+1. [Google Admin Console](https://admin.google.com) → **Directory → Users → Add new user**
+2. Primary email: `<role>@bot-fleet.org`, generate temp password
+3. Open incognito → log in as the new user → change password → enable 2FA (Authenticator app)
+4. Save the TOTP setup key — dispatch-bot stores it in vault
 
-### Step 1.2: First Login and Security Setup
+### 1.2 — GitHub Account
 
-1. Open an incognito browser window
-2. Log in to [accounts.google.com](https://accounts.google.com) as `<role>@bot-fleet.org`
-3. Google will prompt to change the temporary password — set a strong password
-4. Navigate to **Google Account → Security → 2-Step Verification**
-5. Enable 2FA using **Authenticator app** — save the TOTP setup key somewhere safe (dispatch-bot will store it in 1Password during Phase 3)
-6. Complete 2FA setup by entering the generated code
+1. Still in same incognito session (logged in as `<role>@bot-fleet.org`)
+2. [github.com](https://github.com) → **Sign up → Sign in with Google**
+3. Username: `botfleet-<short-role>`
 
-### Step 1.3: Create GitHub Account via Google OAuth
+> No separate GitHub password — authentication flows through Google account.
 
-1. In the same incognito session (still logged in as `<role>@bot-fleet.org`)
-2. Navigate to [github.com](https://github.com) → **Sign up**
-3. Select **"Sign in with Google"** — GitHub will use the bot's Google account
-4. Set GitHub username to `botfleet-<short-role>`
-5. Complete GitHub account setup
+### 1.3 — GitHub PAT
 
-> **No separate GitHub password** is created. Authentication flows through the Google account. Google 2FA protects GitHub as well.
+1. GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Name: `bot-fleet-pat` | Expiry: 90 days | Scopes: `repo` + `read:org`
+3. **Hand token to dispatch-bot** via Telegram
 
-### Step 1.4: Generate Classic PAT
+### 1.4 — Invite to Bot-Fleet-Inc
 
-1. Still logged in as the new GitHub user
-2. Navigate to **Settings → Developer settings → Personal access tokens → Tokens (classic)**
-3. Create token:
-   - Name: `bot-fleet-pat`
-   - Expiry: 90 days
-   - Scopes: `repo` (full repo access) + `read:org` (read org membership)
-4. Copy the token value — **hand it to dispatch-bot** (paste in Telegram or create an issue `bot:dispatch`)
+1. From `jorgen-fleet-boss`: invite `botfleet-<short-role>` to **`Bot-Fleet-Inc`** org
+2. Accept invitation in bot's incognito session
 
-### Step 1.5: Invite to Bot Fleet Inc
+### 1.5 — API Keys
 
-1. From `jorgen-fleet-boss` GitHub account:
-   - Invite `botfleet-<short-role>` to the **`Bot-Fleet-Inc`** org
-   - Add to the appropriate GitHub Team (see CHARTER.md for team assignments)
-2. Switch to the bot's incognito session and accept the invitation
+| Key | How to get | Hand to |
+|-----|-----------|---------|
+| Gemini API key | [AI Studio](https://aistudio.google.com/apikey) logged in as bot | dispatch-bot |
+| Telegram bot token | @BotFather → `/newbot` → name `<Display Name>` → username `<short-role>_bfi_bot` | dispatch-bot |
 
-> **Note**: Bots are members of `Bot-Fleet-Inc` **only** — never invite bots to other orgs.
-
-### Step 1.6: Provision API Keys
-
-1. **Gemini API key** (per-bot, free tier):
-   - Go to [Google AI Studio](https://aistudio.google.com/apikey) logged in as `<role>@bot-fleet.org`
-   - Create an API key
-   - Hand value to dispatch-bot for vault storage
-
-2. **Telegram bot token**:
-   - Create via @BotFather: `/newbot` → name `<Bot Display Name>` → username `<short-role>_bfi_bot`
-   - Hand token to dispatch-bot for vault storage
-
-3. **OpenClaw hook token** (per-bot):
-   - dispatch-bot will generate this: `openssl rand -hex 32`
-
-> **Anthropic API key**: shared across fleet, already in vault — dispatch-bot handles injection.
+> **Anthropic API key**: fleet-shared, already in vault — dispatch-bot injects it.
+> **OpenClaw hook token**: dispatch-bot generates it (`openssl rand -hex 32`) — human does not need to provide.
 
 ---
 
-## Phase 2: Infrastructure Provisioning (Human or devops-proxmox-bot)
+## Phase 2: Infrastructure Provisioning (dispatch-bot — autonomous)
 
-### Step 2.1: Clone VM from Template
+dispatch-bot provisions the VM via Proxmox API. Human action is **not required**.
 
-On Proxmox host:
-
-```bash
-# Clone from Cloud-Init template
-qm clone 9000 <VMID> --name prod-botfleet-<short-role>-01 --full
-
-# Set VM resources (standard bot: 2 vCPU, 4 GB RAM, 32 GB disk)
-qm set <VMID> -cores 2 -memory 4096
-qm resize <VMID> scsi0 32G
-
-# Set network (VLAN 1010)
-qm set <VMID> -net0 virtio,bridge=vmbr1010,tag=1010
-
-# Set Cloud-Init IP
-qm set <VMID> -ipconfig0 ip=172.16.10.<XX>/24,gw=172.16.10.1
-```
-
-### Step 2.2: Start VM and Verify
+### 2.1 — Clone VM from Template
 
 ```bash
-qm start <VMID>
-
-# Wait for Cloud-Init, then verify
-qm guest exec <VMID> -- hostname
-qm guest exec <VMID> -- ping -c 1 172.16.10.1
+# Via Proxmox API (dispatch-bot token: dispatch-bot@pve!provisioner)
+POST /nodes/proxmox/qemu/9000/clone
+{
+  "newid": <VMID>,
+  "name": "prod-botfleet-<short-role>-01",
+  "full": true,
+  "storage": "raid2z"
+}
 ```
+
+### 2.2 — Configure Cloud-Init
+
+```bash
+PUT /nodes/proxmox/qemu/<VMID>/config
+{
+  "cores": 2, "memory": 4096,
+  "net0": "virtio,bridge=vmbr1010",
+  "ipconfig0": "ip=172.16.10.<XX>/24,gw=172.16.10.1",
+  "sshkeys": "<jorgen-keys + dispatch-bot-provisioner-key>"
+}
+
+POST /nodes/proxmox/qemu/<VMID>/resize
+{ "disk": "scsi0", "size": "64G" }
+
+POST /nodes/proxmox/qemu/<VMID>/status/start
+```
+
+### 2.3 — Verify VM Network
+
+**⚠️ Always verify outbound internet before proceeding to Phase 3.**
+
+```bash
+SSH="ssh -i /tmp/<bot>-id -o StrictHostKeyChecking=no root@172.16.10.<XX>"
+$SSH "curl -s --max-time 5 https://github.com > /dev/null && echo OK || echo BLOCKED"
+$SSH "curl -s --max-time 3 http://archive.ubuntu.com/ > /dev/null && echo APT_OK || echo APT_BLOCKED"
+```
+
+If blocked: create a blocker issue assigned to Jørgen — VLAN 1010 needs outbound TCP 443/80 rule in UniFi. **Do not proceed until internet is confirmed.**
 
 ---
 
-## Phase 3: Bot Configuration (dispatch-bot + Human)
+## Phase 3: Configuration & Deployment (dispatch-bot — autonomous)
 
-### Step 3.1: dispatch-bot — Store Credentials in 1Password
+### 3.1 — Store Credentials in 1Password
 
-dispatch-bot stores all credentials handed over in Phase 1 following `docs/1password-entry-standard.md`:
-- Login item: `<Display Name> (bot-fleet.org)` — GWS password, TOTP key, GitHub username, PAT, VMID, IP
-- PAT item: `GitHub PAT — <bot-name>`
-- API key item: `Gemini API Key — <bot-name>`
-- Telegram item: `Telegram Token — <bot-name>`
-- Hook token: `OpenClaw Hook Token — <bot-name>` (generated by dispatch-bot)
+dispatch-bot stores all credentials from Phase 1 following `docs/1password-entry-standard.md`:
 
-### Step 3.2: dispatch-bot — Create Private Repo + Populate Workspace
+| Vault item | Naming convention |
+|-----------|-----------------|
+| Login (master) | `<Display Name> (bot-fleet.org)` |
+| GitHub PAT | `GitHub PAT — <bot-name>` |
+| Telegram token | `Telegram Bot Token — <bot-name>` |
+| Gemini key | `Gemini API Key — <bot-name>` |
+| Hook token | `OpenClaw Hook Token — <bot-name>` |
+
+### 3.2 — Create Private Repo + Populate Workspace
 
 ```bash
 gh repo create Bot-Fleet-Inc/<bot-name> --private
 ```
 
-Copy workspace files from `bots/<bot-name>/` in fleet-ops and push to private repo. Instantiate OpenClaw config from template.
+Push workspace files: `SOUL.md`, `AGENTS.md`, `IDENTITY.md`, `MEMORY.md`, `HEARTBEAT.md`, `CONTEXT.md`, `TOOLS.md`, `CLAUDE.md`, `openclaw.json`, `.gitignore`.
 
-### Step 3.3: dispatch-bot — Update Fleet Registry
+> **OpenClaw config**: Do **not** use the template at `shared/config/openclaw/openclaw.json.template` — it may be outdated. Generate from dispatch-bot's working config or use the canonical example at the bottom of this document.
 
-Update these files in fleet-ops:
+### 3.3 — Update Fleet Registry
 
-| File | What to Add |
+| File | What to add |
 |------|-------------|
 | `shared/config/fleet-knowledge.md` | Row in Fleet Members table |
 | `docs/bot-role-taxonomy.md` | Role definition section |
 | `docs/email-infrastructure.md` | Row in Bot Email Address Map |
-| `docs/inter-bot-protocol.md` | Row in bot label table + interaction matrix |
+| `docs/inter-bot-protocol.md` | Row in bot label table |
 | `docs/deployment-runbook.md` | Row in Bot Registry table |
 | `docs/github-machine-users.md` | Row in machine users table |
+| `infra/proxmox/vm-specifications.md` | VM row |
 
-### Step 3.4: dispatch-bot — Update ArchiMate Viewpoint
-
-Add to `docs/viewpoints/technology-infrastructure.md`:
-- New node element in VM table, topology diagram, tier assignments
-
-### Step 3.5: Human — Deploy to VM
-
-Follow `docs/deployment-runbook.md` Steps 2–8:
-1. Create directory structure on VM
-2. Clone repository
-3. Inject secrets from 1Password (dispatch-bot provides values on request)
-4. Authenticate gh CLI
-5. Install systemd units
-6. Start bot service
-7. Verify deployment
-
-### Step 3.6: Human — Verify End-to-End
+### 3.4 — Install Runtime on VM
 
 ```bash
-sudo systemctl status bot@<bot-name>.service
-sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1
+SSH="ssh -i /tmp/<bot>-id -o StrictHostKeyChecking=no root@172.16.10.<XX>"
+
+# Node.js 22 via NodeSource (⚠️ apt default is Node 18 — too old for OpenClaw)
+$SSH "apt-get install -y ca-certificates gnupg && \
+  mkdir -p /etc/apt/keyrings && \
+  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | \
+    gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+  echo 'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' \
+    > /etc/apt/sources.list.d/nodesource.list && \
+  apt-get update -qq && apt-get install -y nodejs && node --version"
+# Expected: v22.x.x
+
+# OpenClaw
+$SSH "npm install -g openclaw && openclaw --version"
+
+# gh CLI
+$SSH "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+    dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
+  echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+    https://cli.github.com/packages stable main' > /etc/apt/sources.list.d/github-cli.list && \
+  apt-get update -qq && apt-get install -y gh && gh --version"
+```
+
+### 3.5 — Create Directory Structure + Inject Secrets
+
+```bash
+$SSH "mkdir -p /opt/bot/{workspace/<bot-name>,secrets,.openclaw/agents/<bot-name>/agent} && \
+  useradd -m -s /bin/bash bot && \
+  chown -R bot:bot /opt/bot && \
+  mkdir -p /var/log/bot && chown bot:bot /var/log/bot"
+
+# Copy workspace files
+scp -i /tmp/<bot>-id -r /tmp/<bot>-workspace/* root@172.16.10.<XX>:/opt/bot/workspace/<bot-name>/
+
+# Write secrets file
+$SSH "cat > /opt/bot/secrets/<bot-name>.env << 'EOF'
+GITHUB_TOKEN=<PAT>
+ANTHROPIC_API_KEY=<shared-fleet-key>
+GEMINI_API_KEY=<bot-gemini-key>
+TELEGRAM_BOT_TOKEN=<telegram-token>
+BOT_NAME=<bot-name>
+LOCAL_LLM_URL=http://172.16.11.10:11434
+OPENCLAW_HOOK_TOKEN=<generated-token>
+EOF
+chmod 600 /opt/bot/secrets/<bot-name>.env"
+
+# Authenticate gh CLI
+$SSH "echo '<PAT>' | sudo -u bot gh auth login --with-token"
+```
+
+### 3.6 — Copy OpenClaw Config and OAuth Token
+
+```bash
+# OpenClaw config (validated schema)
+scp -i /tmp/<bot>-id /tmp/<bot>-openclaw.json \
+  root@172.16.10.<XX>:/opt/bot/.openclaw/openclaw.json
+
+# Claude Max OAuth token — MUST be copied before service start
+# Without this, bot starts but fails with HTTP 401 on first message
+scp -i /tmp/<bot>-id \
+  /opt/bot/.openclaw/agents/dispatch-bot/agent/auth-profiles.json \
+  root@172.16.10.<XX>:/opt/bot/.openclaw/agents/<bot-name>/agent/auth-profiles.json
+
+$SSH "chown -R bot:bot /opt/bot/.openclaw"
+```
+
+### 3.7 — Install and Start systemd Service
+
+```bash
+# Write unit file (note: ExecStart path is /usr/bin/openclaw, NOT /usr/local/bin)
+$SSH "cat > /etc/systemd/system/openclaw-bot@.service << 'EOF'
+[Unit]
+Description=Bot Fleet (OpenClaw) - %i
+After=network-online.target
+Wants=network-online.target
+StartLimitBurst=5
+StartLimitIntervalSec=600
+
+[Service]
+Type=simple
+User=bot
+Group=bot
+WorkingDirectory=/opt/bot/workspace/%i
+EnvironmentFile=/opt/bot/secrets/%i.env
+Environment=HOME=/opt/bot
+Environment=OPENCLAW_HOME=/opt/bot
+ExecStart=/usr/bin/openclaw gateway run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF"
+
+# ⚠️ OPENCLAW_HOME must be /opt/bot (NOT /opt/bot/.openclaw)
+# OpenClaw appends /.openclaw/ itself — double-nesting breaks config loading
+
+$SSH "systemctl daemon-reload && \
+  systemctl enable openclaw-bot@<bot-name>.service && \
+  systemctl start openclaw-bot@<bot-name>.service && \
+  sleep 5 && systemctl is-active openclaw-bot@<bot-name>.service"
+# Expected: active
 ```
 
 ---
 
-## Phase 4: Post-Provisioning (dispatch-bot)
+## Phase 4: Post-Provisioning (dispatch-bot — autonomous)
 
-### 4.1 — Claude Max OAuth Token
-dispatch-bot holds the shared Claude Max OAuth token (Claude Max subscription, shared fleet credential). Copy it to the new bot before starting the service:
+### 4.1 — Telegram Pairing
+
+The bot will not respond until Jørgen is approved as a paired sender.
+
+1. Jørgen sends any message to `@<short-role>_bfi_bot` on Telegram
+2. Bot responds with: `Pairing code: XXXXXXXX`
+3. dispatch-bot approves:
+   ```bash
+   SSH="ssh -i /tmp/<bot>-id -o StrictHostKeyChecking=no root@172.16.10.<XX>"
+   $SSH "sudo -u bot bash -c 'export HOME=/opt/bot OPENCLAW_HOME=/opt/bot && \
+     set -a && source /opt/bot/secrets/<bot-name>.env && set +a && \
+     /usr/bin/openclaw pairing approve telegram <CODE>'"
+   ```
+4. Jørgen confirms the bot responds
+
+### 4.2 — Verification
 
 ```bash
-SSH="ssh -i /tmp/<bot>-id -o StrictHostKeyChecking=no root@<vm-ip>"
-$SSH "mkdir -p /opt/bot/.openclaw/agents/<bot-name>/agent"
-# Copy auth-profiles.json from dispatch-bot
-scp /opt/bot/.openclaw/agents/dispatch-bot/agent/auth-profiles.json \
-  root@<vm-ip>:/opt/bot/.openclaw/agents/<bot-name>/agent/auth-profiles.json
-$SSH "chown -R bot:bot /opt/bot/.openclaw/agents"
+# Service health
+$SSH "systemctl is-active openclaw-bot@<bot-name>.service"   # → active
+$SSH "sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1"  # → success
+
+# End-to-end: send a test message via Telegram and confirm response
 ```
 
-> **Do this before starting the service** — the bot will fail with HTTP 401 on first message otherwise.
+### 4.3 — Handover
 
-### 4.2 — Telegram Pairing
-The new bot will not accept messages until its owner is approved as a paired sender.
-
-1. Have the human (Jørgen) send any message to the new bot on Telegram
-2. The bot responds with a pairing code: `Pairing code: XXXXXXXX`
-3. dispatch-bot approves via SSH on the bot's VM:
-   ```bash
-   sudo -u bot bash -c 'export HOME=/opt/bot OPENCLAW_HOME=/opt/bot && \
-     set -a && source /opt/bot/secrets/<bot-name>.env && set +a && \
-     /usr/bin/openclaw pairing approve telegram <CODE>'
-   ```
-4. Confirm the human can now chat with the bot
-
-### 4.2 — Verification & Handover
-- Send a test message via Telegram → verify bot responds correctly
-- Track PAT expiry in MEMORY.md (90-day window, 14-day reminder)
-- Comment on onboarding epic with go-live confirmation
+- Track PAT expiry in dispatch-bot MEMORY.md (14-day warning before 90-day expiry)
+- Comment on onboarding epic with go-live confirmation + Telegram test screenshot
+- Update Onboarding Playbook project board (#21): new bot epic → Done
+- Close onboarding epic and all sub-issues
 - Dispatch first real task to the new bot
 
 ---
 
-## Quick Reference: Bot Naming Conventions
+## Known Gotchas (lessons from design-bot onboarding)
+
+| # | Problem | Root cause | Fix |
+|---|---------|------------|-----|
+| 1 | `openclaw: command not found` after npm install | Node 18 from apt — OpenClaw needs 20+ | Use NodeSource Node 22 (Phase 3.4) |
+| 2 | Systemd `status=203/EXEC` | Unit hardcoded `/usr/local/bin/openclaw` | Path is `/usr/bin/openclaw` (Phase 3.7) |
+| 3 | Systemd `status=226/NAMESPACE` | `/var/log/bot` doesn't exist on fresh VM | Create it with `mkdir -p /var/log/bot` (Phase 3.5) |
+| 4 | `Missing config` / wrong config path | `OPENCLAW_HOME=/opt/bot/.openclaw` double-nests | Set `OPENCLAW_HOME=/opt/bot` (Phase 3.7) |
+| 5 | Config validation errors on startup | fleet-ops `openclaw.json.template` has outdated schema | Write config from scratch or use canonical example below |
+| 6 | HTTP 401 on first Telegram message | `auth-profiles.json` not copied before service start | Always do Phase 3.6 before 3.7 |
+| 7 | Bot ignores all Telegram messages | Telegram pairing not approved | Phase 4.1 — `openclaw pairing approve telegram <CODE>` |
+| 8 | Deployment stalls — can't reach GitHub or apt | VLAN 1010 has no outbound internet | Phase 2.3 network check — create blocker issue for Jørgen if blocked |
+| 9 | Proxmox API 403 | `privsep=1` requires ACL on both user AND token | Verify both `dispatch-bot@pve` and `dispatch-bot@pve!provisioner` have the role |
+
+---
+
+## Canonical openclaw.json (validated v2026.3.2)
+
+Use this as the base config for new bots. Replace `<bot-name>` and `<bot-display-name>`.
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "contextPruning": {
+        "mode": "cache-ttl",
+        "ttl": "5m",
+        "keepLastAssistants": 5,
+        "softTrimRatio": 0.3,
+        "hardClearRatio": 0.3,
+        "minPrunableToolChars": 50000,
+        "softTrim": { "maxChars": 4000, "headChars": 750, "tailChars": 750 },
+        "hardClear": { "enabled": true, "placeholder": "[Cleared — re-run tool if needed]" }
+      },
+      "compaction": {
+        "mode": "safeguard",
+        "reserveTokensFloor": 40000,
+        "maxHistoryShare": 0.6
+      }
+    },
+    "list": [
+      {
+        "id": "<bot-name>",
+        "default": true,
+        "name": "<bot-display-name>",
+        "workspace": "/opt/bot/workspace/<bot-name>",
+        "agentDir": "/opt/bot/.openclaw/agents/<bot-name>/agent",
+        "model": "anthropic/claude-sonnet-4-6"
+      }
+    ]
+  },
+  "models": {
+    "providers": {
+      "anthropic": {
+        "baseUrl": "https://api.anthropic.com",
+        "models": [
+          { "id": "claude-sonnet-4-20250514", "name": "Claude Sonnet 4" }
+        ]
+      },
+      "google": {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "models": [
+          { "id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash" }
+        ]
+      }
+    }
+  },
+  "tools": {
+    "exec": {
+      "host": "gateway",
+      "security": "full",
+      "ask": "off",
+      "safeBins": ["gh", "git", "curl", "op", "openclaw"],
+      "safeBinProfiles": { "curl": {}, "gh": {}, "git": {}, "op": {}, "openclaw": {} }
+    }
+  },
+  "bindings": [
+    { "agentId": "<bot-name>", "match": { "channel": "telegram" } }
+  ],
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "streaming": "partial",
+      "accounts": {
+        "default": {
+          "botToken": "${TELEGRAM_BOT_TOKEN}",
+          "dmPolicy": "pairing",
+          "streaming": "partial"
+        }
+      }
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "auth": { "mode": "token", "token": "${OPENCLAW_HOOK_TOKEN}" }
+  },
+  "commands": { "native": "auto", "nativeSkills": "auto", "restart": true },
+  "memory": {},
+  "skills": {}
+}
+```
+
+---
+
+## Quick Reference: Naming Conventions
 
 | Component | Pattern | Example |
 |-----------|---------|---------|
-| Bot name | `<function>-bot` | `analytics-bot` |
-| GitHub user | `botfleet-<short-role>` | `botfleet-analytics` |
-| Email | `<role>@bot-fleet.org` | `analytics@bot-fleet.org` |
-| VM hostname | `prod-botfleet-<short-role>-01` | `prod-botfleet-analytics-01` |
+| Bot name | `<function>-bot` | `coding-bot` |
+| GitHub user | `botfleet-<short-role>` | `botfleet-coding` |
+| Email | `<role>@bot-fleet.org` | `coding@bot-fleet.org` |
+| VM hostname | `prod-botfleet-<short-role>-01` | `prod-botfleet-coding-01` |
 | VMID | 410–429 | `417` |
-| IP | `172.16.10.<20-39>` | `172.16.10.27` |
-| Bot label | `bot:<short-name>` | `bot:analytics` |
-| 1Password Login | `<Display Name> (bot-fleet.org)` | `Analytics Bot (bot-fleet.org)` |
-| 1Password PAT | `GitHub PAT — <bot-name>` | `GitHub PAT — analytics-bot` |
-| systemd unit | `bot@<bot-name>.service` | `bot@analytics-bot.service` |
-| Issue comment | `<emoji> **<bot-name>**: message` | `📈 **analytics-bot**: Done.` |
+| IP | `172.16.10.<VMID-390>` | `172.16.10.27` |
+| Bot label | `bot:<short-name>` | `bot:coding` |
+| 1Password Login | `<Display Name> (bot-fleet.org)` | `Coding Bot (bot-fleet.org)` |
+| 1Password PAT | `GitHub PAT — <bot-name>` | `GitHub PAT — coding-bot` |
+| systemd unit | `openclaw-bot@<bot-name>.service` | `openclaw-bot@coding-bot.service` |
+| Issue comment prefix | `<emoji> **<bot-name>**:` | `💻 **coding-bot**:` |
+| Telegram username | `<short-role>_bfi_bot` | `coding_bfi_bot` |
 
 ---
 
 ## Deprovisioning a Bot
 
-1. Stop and disable systemd units on the VM
-2. Remove from all fleet registry files (reverse of Step 3.3)
-3. Remove `bots/<bot-name>/` directory
-4. dispatch-bot revokes and removes credentials from vault
-5. Delete GWS user in admin console
-6. Destroy VM on Proxmox: `qm destroy <VMID>`
-7. Free up VMID and IP in allocation scheme
-8. Update ArchiMate viewpoint
+1. Stop and disable: `systemctl disable --now openclaw-bot@<bot-name>.service`
+2. Revoke and remove credentials from vault (dispatch-bot)
+3. Remove from all fleet registry files (reverse of Phase 3.3)
+4. Delete GWS user in admin console
+5. Destroy VM: `DELETE /nodes/proxmox/qemu/<VMID>` via Proxmox API
+6. Free VMID and IP in allocation table
+7. Archive bot repo (do not delete — preserve history)
 
 ---
 
@@ -321,11 +468,10 @@ The new bot will not accept messages until its owner is approved as a paired sen
 
 | Document | Purpose |
 |----------|---------|
-| `docs/deployment-runbook.md` | Detailed VM deployment steps |
-| `docs/1password-entry-standard.md` | Canonical 1Password entry structure |
-| `docs/cloudflare-credentials.md` | Token strategy and 1Password naming convention |
-| `docs/viewpoints/credential-management.md` | ArchiMate layered viewpoint for credential architecture |
-| `docs/email-infrastructure.md` | Email worker API for GitHub verification |
-| `docs/github-machine-users.md` | GitHub account standards and profile template |
-| `docs/bot-role-taxonomy.md` | Role definitions and interaction patterns |
-| `shared/config/fleet-knowledge.md` | Canonical fleet roster |
+| `docs/deployment-runbook.md` | VM deployment steps |
+| `docs/1password-entry-standard.md` | 1Password entry naming standard |
+| `docs/cloudflare-credentials.md` | Token strategy |
+| `docs/email-infrastructure.md` | Email worker API |
+| `docs/github-machine-users.md` | GitHub account standards |
+| `docs/bot-role-taxonomy.md` | Role definitions |
+| `shared/config/fleet-knowledge.md` | Fleet roster |
