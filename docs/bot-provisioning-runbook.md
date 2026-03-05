@@ -38,6 +38,32 @@ Before starting, determine:
 | **Role category** | Core / DevOps / Specialist | `Specialist` |
 | **Emoji** | One emoji for issue comments | `📈` |
 | **Milestone** | Which milestone this bot ships in | `M2` |
+| **Default model** | Primary LLM for this bot | `Claude Sonnet 4.6 / OAuth` |
+| **Model rationale** | Why this tier | e.g. "lightweight triage — Gemini Flash sufficient" |
+
+
+### Model Hierarchy
+
+Define the bot's LLM tier **before** provisioning — it affects the OpenClaw config template substitution and cost planning.
+
+**Default hierarchy (all bots unless overridden):**
+
+| Priority | Model | Auth | When |
+|----------|-------|------|------|
+| 1st | Claude Sonnet 4.6 | OAuth (Max sub) | Default — daily work |
+| 2nd | Claude Sonnet 4.6 | API key | OAuth limit fallback → notify dispatch-bot |
+| 3rd | Gemini 2.5 Flash | API key | Last resort |
+
+**Override examples:**
+
+| Bot type | Suggested default | Rationale |
+|----------|-------------------|-----------|
+| Lightweight (triage, labelling) | Gemini 2.5 Flash | Simple tasks, free tier, low cost |
+| Standard specialist | Claude Sonnet 4.6 / OAuth | Good reasoning, covered by Max sub |
+| Architecture / complex reasoning | Claude Opus 4.6 / OAuth | Needs stronger model for EA work |
+| Cost-sensitive high-volume | Gemini 2.5 Flash + Sonnet fallback | Volume over quality |
+
+Document the decision in the onboarding epic issue and in the bot's `AGENTS.md` under **Model Routing**.
 
 ### VMID Allocation Scheme
 
