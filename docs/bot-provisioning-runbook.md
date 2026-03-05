@@ -2,7 +2,7 @@
 
 Step-by-step guide for adding a new bot to the fleet — from identity creation to operational verification.
 
-**Version**: 2.0
+**Version**: 2.1
 **Last Updated**: 2026-03-05
 **Authors**: dispatch-bot (lessons learned: design-bot onboarding)
 
@@ -234,7 +234,59 @@ chmod 600 /opt/bot/secrets/<bot-name>.env"
 $SSH "echo '<PAT>' | sudo -u bot gh auth login --with-token"
 ```
 
-### 3.6 — Copy OpenClaw Config and OAuth Token
+### 3.6 — Create Skillset Repo
+
+Each bot gets a private `skillset-<bot-name>` repo in `Bot-Fleet-Inc` containing Claude Code skills tailored to its domain.
+
+```bash
+gh repo create Bot-Fleet-Inc/skillset-<bot-name> --private \
+  --description "Claude Code skills for <Display Name>"
+```
+
+Scaffold initial skills relevant to the bot's domain and push. At minimum include one domain-specific skill. Reference `skillset-dispatch-bot` for structure.
+
+Install skills on the VM:
+```bash
+$SSH "mkdir -p /opt/bot/.openclaw/skills && \
+  sudo -u bot gh repo clone Bot-Fleet-Inc/skillset-<bot-name> /tmp/skillset && \
+  cp -r /tmp/skillset/skills/* /opt/bot/.openclaw/skills/ && \
+  chown -R bot:bot /opt/bot/.openclaw/skills"
+```
+
+Add `"skills": { "path": "/opt/bot/.openclaw/skills" }` to `openclaw.json`.
+Add 06:00 UTC daily skills sync cron to the bot's `HEARTBEAT.md`.
+
+### 3.7 — Set Up Git Backup
+
+Each bot's workspace is backed up nightly to its private repo via systemd timer.
+
+```bash
+# Set git remote on VM using the bot's own PAT
+$SSH "cd /opt/bot/workspace/<bot-name> && \
+  sudo -u bot git init && \
+  sudo -u bot git remote add origin https://<BOT_PAT>@github.com/Bot-Fleet-Inc/<bot-name>.git"
+
+# Install backup systemd units from fleet-ops
+gh api repos/Bot-Fleet-Inc/fleet-ops/contents/shared/config/systemd/bot-backup@.timer \
+  --jq '.content' | base64 -d | $SSH "cat > /etc/systemd/system/bot-backup@.timer"
+gh api repos/Bot-Fleet-Inc/fleet-ops/contents/shared/config/systemd/bot-backup@.service \
+  --jq '.content' | base64 -d | $SSH "cat > /etc/systemd/system/bot-backup@.service"
+
+# Install backup script
+$SSH "mkdir -p /opt/bot/workspace/fleet-ops/shared/config/scripts"
+gh api repos/Bot-Fleet-Inc/fleet-ops/contents/shared/config/scripts/nightly-backup.sh \
+  --jq '.content' | base64 -d | \
+  $SSH "cat > /opt/bot/workspace/fleet-ops/shared/config/scripts/nightly-backup.sh && \
+        chmod +x /opt/bot/workspace/fleet-ops/shared/config/scripts/nightly-backup.sh"
+
+# Enable timer (first backup runs at 02:00 UTC)
+$SSH "systemctl daemon-reload && \
+  systemctl enable bot-backup@<bot-name>.timer && \
+  systemctl start bot-backup@<bot-name>.timer && \
+  systemctl list-timers bot-backup*"
+```
+
+### 3.8 — Copy OpenClaw Config and OAuth Token
 
 ```bash
 # OpenClaw config (validated schema)
@@ -250,7 +302,7 @@ scp -i /tmp/<bot>-id \
 $SSH "chown -R bot:bot /opt/bot/.openclaw"
 ```
 
-### 3.7 — Install and Start systemd Service
+### 3.9 — Install and Start systemd Service
 
 ```bash
 # Write unit file (note: ExecStart path is /usr/bin/openclaw, NOT /usr/local/bin)
@@ -340,6 +392,8 @@ $SSH "sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1"  # →
 | 7 | Bot ignores all Telegram messages | Telegram pairing not approved | Phase 4.1 — `openclaw pairing approve telegram <CODE>` |
 | 8 | Deployment stalls — can't reach GitHub or apt | VLAN 1010 has no outbound internet | Phase 2.3 network check — create blocker issue for Jørgen if blocked |
 | 9 | Proxmox API 403 | `privsep=1` requires ACL on both user AND token | Verify both `dispatch-bot@pve` and `dispatch-bot@pve!provisioner` have the role |
+| 10 | Bot has no skills | Skillset repo and install step missing from deployment | Phase 3.6 — create `skillset-<bot-name>` repo and install before starting service |
+| 11 | Workspace not backed up | git remote and backup timer not configured | Phase 3.7 — set git remote + enable `bot-backup@<bot-name>.timer` |
 
 ---
 
