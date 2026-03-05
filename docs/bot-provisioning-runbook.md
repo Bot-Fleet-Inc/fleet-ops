@@ -240,14 +240,7 @@ Follow `docs/deployment-runbook.md` Steps 2–8:
 6. Start bot service
 7. Verify deployment
 
-### Step 3.6: Human — Enable Chat Channel
-
-1. Add `"<bot-name>"` to the `BOTS` array in `infra/chat/worker/src/ui.ts`
-2. Deploy the worker: `cd infra/chat/worker && npx wrangler deploy`
-3. Request chat credentials from dispatch-bot — inject into `/opt/bot/secrets/<bot-name>.env` on VM
-4. Verify — send a test message from `chat.bot-fleet.org`
-
-### Step 3.7: Human — Verify End-to-End
+### Step 3.6: Human — Verify End-to-End
 
 ```bash
 sudo systemctl status bot@<bot-name>.service
