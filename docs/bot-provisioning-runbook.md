@@ -251,7 +251,21 @@ sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1
 
 ## Phase 4: Post-Provisioning (dispatch-bot)
 
-- Create test issue → verify bot responds correctly
+### 4.1 — Telegram Pairing
+The new bot will not accept messages until its owner is approved as a paired sender.
+
+1. Have the human (Jørgen) send any message to the new bot on Telegram
+2. The bot responds with a pairing code: `Pairing code: XXXXXXXX`
+3. dispatch-bot approves via SSH on the bot's VM:
+   ```bash
+   sudo -u bot bash -c 'export HOME=/opt/bot OPENCLAW_HOME=/opt/bot && \
+     set -a && source /opt/bot/secrets/<bot-name>.env && set +a && \
+     /usr/bin/openclaw pairing approve telegram <CODE>'
+   ```
+4. Confirm the human can now chat with the bot
+
+### 4.2 — Verification & Handover
+- Send a test message via Telegram → verify bot responds correctly
 - Track PAT expiry in MEMORY.md (90-day window, 14-day reminder)
 - Comment on onboarding epic with go-live confirmation
 - Dispatch first real task to the new bot
