@@ -51,6 +51,8 @@ Each bot has a dedicated label. Issues with these labels are visible to the assi
 | `bot:devcloudflare` | devops-cloudflare-bot |
 | `bot:unifi` | unifi-network-bot |
 | `bot:crm` | crm-bot |
+| `bot:design` | design-bot |
+| `bot:knowledge` | knowledge-bot |
 
 ### Priority Labels
 
