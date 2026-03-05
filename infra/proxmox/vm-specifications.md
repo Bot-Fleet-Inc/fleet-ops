@@ -39,6 +39,7 @@ All VMs follow enterprise standards from [ea-deploy-proxmox](https://github.com/
 | 413 | `prod-botfleet-audit-01` | `172.16.10.23` | 1010 | 2 vCPU | 4 GB | 64 GB | Audit |
 | 414 | `prod-botfleet-coding-01` | `172.16.10.24` | 1010 | 4 vCPU | 8 GB | 128 GB | Coding |
 | 415 | `prod-botfleet-projectmgmt-01` | `172.16.10.25` | 1010 | 2 vCPU | 4 GB | 64 GB | Project Management |
+| 416 | `prod-botfleet-design-01` | `172.16.10.26` | 1010 | 2 vCPU | 4 GB | 64 GB | Design |
 
 ### Infrastructure Bots
 
