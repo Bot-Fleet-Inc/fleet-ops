@@ -2,8 +2,8 @@
 
 Step-by-step guide for adding a new bot to the fleet — from identity creation to operational verification.
 
-**Version**: 1.1
-**Last Updated**: 2026-03-02
+**Version**: 1.2
+**Last Updated**: 2026-03-05
 
 ---
 
@@ -13,9 +13,13 @@ Adding a new bot requires three phases:
 
 | Phase | Owner | Duration | Steps |
 |-------|-------|----------|-------|
-| **1. Identity** | Human | ~15 min | GWS user, GitHub account, PAT, 1Password |
+| **1. Identity** | Human | ~10 min | GWS user, GitHub account, PAT |
 | **2. Infrastructure** | Human (or devops-proxmox-bot) | ~10 min | VM provisioning on Proxmox |
-| **3. Configuration** | Human + OpenClaw | ~20 min | Workspace, fleet registry, ArchiMate, deploy |
+| **3. Configuration** | dispatch-bot + Human | ~20 min | Workspace, fleet registry, ArchiMate, deploy |
+
+> **Secrets**: dispatch-bot is the sole gateway to the Bot Fleet Vault (1Password). Credential storage and injection is handled by dispatch-bot during Phase 3 — not a human task during Phase 1. See `docs/1password-entry-standard.md` for the naming convention dispatch-bot follows when storing credentials.
+
+> **Per-bot vaults**: Some bots (e.g. audit-bot) may require a dedicated 1Password vault and service account for their own secret access. This is evaluated during each bot's onboarding and noted in the onboarding epic if applicable.
 
 ---
 
@@ -78,11 +82,9 @@ VLAN 1010 (`172.16.10.0/24`):
 1. Open an incognito browser window
 2. Log in to [accounts.google.com](https://accounts.google.com) as `<role>@bot-fleet.org`
 3. Google will prompt to change the temporary password — set a strong password
-4. Save the new password to the 1Password Login item (see Step 1.5)
-5. Navigate to **Google Account → Security → 2-Step Verification**
-6. Enable 2FA using **Authenticator app**
-7. When shown the QR code / setup key, save the TOTP setup key to 1Password's one-time password field
-8. Complete 2FA setup by entering the generated code from 1Password
+4. Navigate to **Google Account → Security → 2-Step Verification**
+5. Enable 2FA using **Authenticator app** — save the TOTP setup key somewhere safe (dispatch-bot will store it in 1Password during Phase 3)
+6. Complete 2FA setup by entering the generated code
 
 ### Step 1.3: Create GitHub Account via Google OAuth
 
@@ -92,7 +94,7 @@ VLAN 1010 (`172.16.10.0/24`):
 4. Set GitHub username to `botfleet-<short-role>`
 5. Complete GitHub account setup
 
-> **No separate GitHub password** is created. Authentication flows through the Google account. This means Google 2FA protects the GitHub account as well.
+> **No separate GitHub password** is created. Authentication flows through the Google account. Google 2FA protects GitHub as well.
 
 ### Step 1.4: Generate Classic PAT
 
@@ -102,77 +104,32 @@ VLAN 1010 (`172.16.10.0/24`):
    - Name: `bot-fleet-pat`
    - Expiry: 90 days
    - Scopes: `repo` (full repo access) + `read:org` (read org membership)
-   - These scopes work across `Bot-Fleet-Inc` repos
-4. Copy the token value
+4. Copy the token value — **hand it to dispatch-bot** (paste in Telegram or create an issue `bot:dispatch`)
 
-### Step 1.5: Store Credentials in 1Password
-
-Store in vault **"Bot Fleet Vault"** following the canonical entry standard (`docs/1password-entry-standard.md`).
-
-**Create the Login item** (one per bot):
-
-| Field | Value |
-|-------|-------|
-| **Item name** | `<Display Name> (bot-fleet.org)` — e.g., `Dispatch Bot (bot-fleet.org)` |
-| **username** | `<role>@bot-fleet.org` |
-| **password** | GWS account password (from Step 1.1) |
-| **website** | `https://bot-fleet.org` |
-
-Add sections:
-- **GitHub**: `GitHub username` = `botfleet-<short-role>`, `GitHub PAT` = classic PAT value
-- **Infrastructure**: `VMID`, `IP address`, `Hostname`, `Security tier`
-
-Add notes:
-```
-Role: <one-line description>
-Created: <YYYY-MM-DD>
-Domain: bot-fleet.org (Google Workspace)
-Repositories: Bot-Fleet-Inc/fleet-ops, Bot-Fleet-Inc/*
-Milestone: <M1, M2, etc.>
-```
-
-Add tags: `botfleet`, `role-<name>`, `tier-<tier>`, `GWS`, `milestone-<N>`
-
-**Create the separate PAT item** (for rotation independence):
-
-| Field | Value |
-|-------|-------|
-| **Item name** | `GitHub PAT — <bot-name>` |
-| **Type** | API Credential |
-| **credential** | Classic PAT value |
-| **username** | `botfleet-<short-role>` |
-
-See `docs/1password-entry-standard.md` for the full entry template and `docs/cloudflare-credentials.md` for the naming convention reference.
-
-### Step 1.6: Invite to Bot Fleet Inc
+### Step 1.5: Invite to Bot Fleet Inc
 
 1. From `jorgen-fleet-boss` GitHub account:
    - Invite `botfleet-<short-role>` to the **`Bot-Fleet-Inc`** org
    - Add to the appropriate GitHub Team (see CHARTER.md for team assignments)
 2. Switch to the bot's incognito session and accept the invitation
 
-> **Note**: Bots are members of `Bot-Fleet-Inc` **only** — never invite bots to other orgs. Since GitHub accounts are created via Google OAuth, no email verification workflow is needed.
+> **Note**: Bots are members of `Bot-Fleet-Inc` **only** — never invite bots to other orgs.
 
----
-
-### Step 1.7: Provision API Keys
-
-OpenClaw uses 4-tier LLM routing with API keys (no subscription needed per bot).
+### Step 1.6: Provision API Keys
 
 1. **Gemini API key** (per-bot, free tier):
    - Go to [Google AI Studio](https://aistudio.google.com/apikey) logged in as `<role>@bot-fleet.org`
    - Create an API key
-   - Store in 1Password as `Gemini API Key — <bot-name>`
+   - Hand value to dispatch-bot for vault storage
 
-2. **OpenClaw hook token** (per-bot):
-   - Generate a random token: `openssl rand -hex 32`
-   - Store in 1Password as `OpenClaw Hook Token — <bot-name>`
+2. **Telegram bot token**:
+   - Create via @BotFather: `/newbot` → name `<Bot Display Name>` → username `<short-role>_bfi_bot`
+   - Hand token to dispatch-bot for vault storage
 
-3. **Anthropic API key** (shared across fleet):
-   - Already exists: `Anthropic API Key — Botfleet` in 1Password
-   - Used for Claude Sonnet/Opus escalation (pay-as-you-go)
+3. **OpenClaw hook token** (per-bot):
+   - dispatch-bot will generate this: `openssl rand -hex 32`
 
-> **Cost**: Gemini Flash free tier covers most bot tasks. Anthropic API is pay-as-you-go, shared across all bots. No per-bot subscription needed.
+> **Anthropic API key**: shared across fleet, already in vault — dispatch-bot handles injection.
 
 ---
 
@@ -209,37 +166,28 @@ qm guest exec <VMID> -- ping -c 1 172.16.10.1
 
 ---
 
-## Phase 3: Bot Configuration
+## Phase 3: Bot Configuration (dispatch-bot + Human)
 
-### Step 3.1: Initialize Workspace
+### Step 3.1: dispatch-bot — Store Credentials in 1Password
+
+dispatch-bot stores all credentials handed over in Phase 1 following `docs/1password-entry-standard.md`:
+- Login item: `<Display Name> (bot-fleet.org)` — GWS password, TOTP key, GitHub username, PAT, VMID, IP
+- PAT item: `GitHub PAT — <bot-name>`
+- API key item: `Gemini API Key — <bot-name>`
+- Telegram item: `Telegram Token — <bot-name>`
+- Hook token: `OpenClaw Hook Token — <bot-name>` (generated by dispatch-bot)
+
+### Step 3.2: dispatch-bot — Create Private Repo + Populate Workspace
 
 ```bash
-# From the repo root
-bash shared/config/scripts/init-bot-workspace.sh <bot-name>
+gh repo create Bot-Fleet-Inc/<bot-name> --private
 ```
 
-This creates `bots/<bot-name>/` with:
-- `SOUL.md` — personality, principles, boundaries
-- `IDENTITY.md` — machine identity (GitHub user, email, VMID, IP)
-- `CONTEXT.md` — organisation and fleet roster
-- `AGENTS.md` — operational configuration
-- `TOOLS.md` — available tools
-- `HEARTBEAT.md` — periodic task schedule
-- `MEMORY.md` — long-term memory (initially empty)
-- `memory/` — daily log directory
-- `.claude/CLAUDE.md` — Agent instructions (legacy)
+Copy workspace files from `bots/<bot-name>/` in fleet-ops and push to private repo. Instantiate OpenClaw config from template.
 
-### Step 3.2: Customise Bot Identity Files
+### Step 3.3: dispatch-bot — Update Fleet Registry
 
-Edit the generated files to set:
-- **SOUL.md**: Mission statement, responsibilities, key boundaries, emoji
-- **IDENTITY.md**: GitHub user, email, VMID, IP, hostname
-- **AGENTS.md**: Issue poll queries, dispatch logic, LLM routing
-- **HEARTBEAT.md**: Scheduled tasks (daily log, backup, health check)
-
-### Step 3.3: Update Fleet Registry
-
-Update these files to register the new bot:
+Update these files in fleet-ops:
 
 | File | What to Add |
 |------|-------------|
@@ -250,87 +198,44 @@ Update these files to register the new bot:
 | `docs/deployment-runbook.md` | Row in Bot Registry table |
 | `docs/github-machine-users.md` | Row in machine users table |
 
-### Step 3.4: Update ArchiMate Viewpoint
+### Step 3.4: dispatch-bot — Update ArchiMate Viewpoint
 
 Add to `docs/viewpoints/technology-infrastructure.md`:
-- New node element in VM table
-- Update topology diagram
-- Update tier assignments
-- Update composition/serving relationships
+- New node element in VM table, topology diagram, tier assignments
 
-### Step 3.5: Deploy to VM
+### Step 3.5: Human — Deploy to VM
 
 Follow `docs/deployment-runbook.md` Steps 2–8:
 1. Create directory structure on VM
 2. Clone repository
-3. Inject secrets from 1Password
+3. Inject secrets from 1Password (dispatch-bot provides values on request)
 4. Authenticate gh CLI
 5. Install systemd units
 6. Start bot service
 7. Verify deployment
 
-### Step 3.6: Enable Chat Channel
+### Step 3.6: Human — Enable Chat Channel
 
-Add the new bot to the Chat Worker sidebar and inject chat credentials into the bot's env file.
+1. Add `"<bot-name>"` to the `BOTS` array in `infra/chat/worker/src/ui.ts`
+2. Deploy the worker: `cd infra/chat/worker && npx wrangler deploy`
+3. Request chat credentials from dispatch-bot — inject into `/opt/bot/secrets/<bot-name>.env` on VM
+4. Verify — send a test message from `chat.bot-fleet.org`
 
-1. **Add bot to UI sidebar** — edit `infra/chat/worker/src/ui.ts`, add `"<bot-name>"` to the `BOTS` array
-2. **Deploy the worker** — `cd infra/chat/worker && npx wrangler deploy`
-3. **Add chat credentials to bot env file** on the VM:
-   ```bash
-   # Append to /opt/bot/secrets/<bot-name>.env:
-   CHAT_WORKER_TOKEN=<value from 1Password: "Cloudflare Bearer Token — Botfleet Chat Worker">
-   CHAT_WORKER_URL=https://chat.bot-fleet.org
-   CF_ACCESS_CLIENT_ID=<value from 1Password: "Cloudflare Service Token — Bot Fleet API">
-   CF_ACCESS_CLIENT_SECRET=<value from 1Password: "Cloudflare Service Token — Bot Fleet API">
-   ```
-4. **Verify** — send a test message from `chat.bot-fleet.org` and confirm the bot can poll its inbox
-
-> **Note**: The Access service token (`Bot Fleet API`) is shared across all bots. The Chat Worker bearer token is also shared. Individual bot identity is determined by the `?bot=<name>` parameter in the poll URL.
-
-### Step 3.7: Verify End-to-End
+### Step 3.7: Human — Verify End-to-End
 
 ```bash
-# Check service is running
 sudo systemctl status bot@<bot-name>.service
-
-# Check bot can list issues
 sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1
-
-# Check LLM connectivity
-sudo -u bot curl -s http://172.16.11.10:8000/health
-
-# Create a test issue
-sudo -u bot gh issue create \
-  --repo Bot-Fleet-Inc/fleet-ops \
-  --title "<bot-name> deployment verification" \
-  --body "Test issue — bot should comment and close." \
-  --label "bot:<short-label>" \
-  --assignee "botfleet-<short-role>"
 ```
 
 ---
 
-## Phase 4: Post-Provisioning
+## Phase 4: Post-Provisioning (dispatch-bot)
 
-### Inform the Fleet
-
-dispatch-bot should be notified of the new bot so it can include it in triage logic. Create an issue:
-
-```bash
-gh issue create \
-  --repo Bot-Fleet-Inc/fleet-ops \
-  --title "Fleet update: <bot-name> provisioned" \
-  --body "New bot <bot-name> (VMID <VMID>, IP <IP>) is deployed and operational. Dispatch logic should include this bot for <domain> issues." \
-  --label "bot:dispatch,priority:medium"
-```
-
-### Set Up Token Rotation Tracking
-
-dispatch-bot automatically tracks PAT expiry. Verify the bot's PAT expiry date is within the 90-day window and that dispatch-bot will create a reminder issue 14 days before expiration.
-
-### GWS Audit Validation
-
-audit-bot periodically validates that the GWS user list matches the fleet roster. After provisioning, the next audit cycle should confirm the new user exists.
+- Create test issue → verify bot responds correctly
+- Track PAT expiry in MEMORY.md (90-day window, 14-day reminder)
+- Comment on onboarding epic with go-live confirmation
+- Dispatch first real task to the new bot
 
 ---
 
@@ -345,7 +250,8 @@ audit-bot periodically validates that the GWS user list matches the fleet roster
 | VMID | 410–429 | `417` |
 | IP | `172.16.10.<20-39>` | `172.16.10.27` |
 | Bot label | `bot:<short-name>` | `bot:analytics` |
-| 1Password | `GitHub PAT — <bot-name>` | `GitHub PAT — analytics-bot` |
+| 1Password Login | `<Display Name> (bot-fleet.org)` | `Analytics Bot (bot-fleet.org)` |
+| 1Password PAT | `GitHub PAT — <bot-name>` | `GitHub PAT — analytics-bot` |
 | systemd unit | `bot@<bot-name>.service` | `bot@analytics-bot.service` |
 | Issue comment | `<emoji> **<bot-name>**: message` | `📈 **analytics-bot**: Done.` |
 
@@ -353,12 +259,10 @@ audit-bot periodically validates that the GWS user list matches the fleet roster
 
 ## Deprovisioning a Bot
 
-To remove a bot from the fleet:
-
 1. Stop and disable systemd units on the VM
 2. Remove from all fleet registry files (reverse of Step 3.3)
 3. Remove `bots/<bot-name>/` directory
-4. Revoke GitHub PAT and delete GitHub account
+4. dispatch-bot revokes and removes credentials from vault
 5. Delete GWS user in admin console
 6. Destroy VM on Proxmox: `qm destroy <VMID>`
 7. Free up VMID and IP in allocation scheme
@@ -370,8 +274,8 @@ To remove a bot from the fleet:
 
 | Document | Purpose |
 |----------|---------|
-| `docs/deployment-runbook.md` | Detailed VM deployment steps (Phase 3.5 references this) |
-| `docs/1password-entry-standard.md` | Canonical 1Password entry structure (Phase 1.5 references this) |
+| `docs/deployment-runbook.md` | Detailed VM deployment steps |
+| `docs/1password-entry-standard.md` | Canonical 1Password entry structure |
 | `docs/cloudflare-credentials.md` | Token strategy and 1Password naming convention |
 | `docs/viewpoints/credential-management.md` | ArchiMate layered viewpoint for credential architecture |
 | `docs/email-infrastructure.md` | Email worker API for GitHub verification |
