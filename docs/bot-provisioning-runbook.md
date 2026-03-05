@@ -251,7 +251,21 @@ sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1
 
 ## Phase 4: Post-Provisioning (dispatch-bot)
 
-### 4.1 — Telegram Pairing
+### 4.1 — Claude Max OAuth Token
+dispatch-bot holds the shared Claude Max OAuth token (Claude Max subscription, shared fleet credential). Copy it to the new bot before starting the service:
+
+```bash
+SSH="ssh -i /tmp/<bot>-id -o StrictHostKeyChecking=no root@<vm-ip>"
+$SSH "mkdir -p /opt/bot/.openclaw/agents/<bot-name>/agent"
+# Copy auth-profiles.json from dispatch-bot
+scp /opt/bot/.openclaw/agents/dispatch-bot/agent/auth-profiles.json \
+  root@<vm-ip>:/opt/bot/.openclaw/agents/<bot-name>/agent/auth-profiles.json
+$SSH "chown -R bot:bot /opt/bot/.openclaw/agents"
+```
+
+> **Do this before starting the service** — the bot will fail with HTTP 401 on first message otherwise.
+
+### 4.2 — Telegram Pairing
 The new bot will not accept messages until its owner is approved as a paired sender.
 
 1. Have the human (Jørgen) send any message to the new bot on Telegram
