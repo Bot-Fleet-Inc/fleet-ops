@@ -33,6 +33,8 @@ Before deploying a bot, ensure:
 | devops-cloudflare-bot | 421 | 172.16.10.31 | prod-botfleet-devcloudflare-01 | botfleet-devcloudflare |
 | unifi-network-bot | 422 | 172.16.10.32 | prod-botfleet-devunifi-01 | botfleet-unifi |
 | crm-bot | 423 | 172.16.10.33 | prod-botfleet-crm-01 | botfleet-crm |
+| design-bot | 416 | 172.16.10.26 | prod-botfleet-design-01 | botfleet-design |
+| knowledge-bot | 417 | 172.16.10.27 | prod-botfleet-knowledge-01 | botfleet-knowledge |
 
 ## SSH Access to Bot Fleet VMs
 
