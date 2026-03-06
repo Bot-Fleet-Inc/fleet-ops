@@ -166,7 +166,7 @@ dispatch-bot triages: clarify requirements, unblock, or escalate to Jørgen.
 | Token name (1Password) | Bot | Vault ID | Scopes |
 |------------------------|-----|----------|--------|
 | BFI Coding Bot Cloudflare | coding-bot | `qeu7leotb6nbkigpvsczluplnm` | Pages:Edit, Workers Scripts:Edit, Analytics:Read |
-| BFI Dispatch Bot Cloudflare | dispatch-bot | `de24x24dp5pxn6t3jhzfjcbnhq` | Workers Scripts:Edit, KV:Edit, R2:Edit, Pages:Edit, Account Settings:Read, Analytics:Read, **Zero Trust:Edit**, **Zone DNS:Edit** (bot-fleet.org) |
+| BFI Dispatch Bot Cloudflare | dispatch-bot | `de24x24dp5pxn6t3jhzfjcbnhq` | Account: DNS Settings:Edit, Email Routing:Edit, Workers KV:Edit, Workers Scripts:Edit, Account Settings:Read, Zero Trust:Edit \| All zones: Email Routing Rules:Edit, Zone:Read, Workers Routes:Edit, DNS:Edit |
 | BFI Audit Bot Cloudflare | audit-bot | `u7mhg6653kp3nvuh67ztb6ue44` | Read-only: all Account + all Zones + all Users |
 | BFI DevOps Cloudflare Bot _(planned)_ | devops-cloudflare-bot | — | Full CF infra scope (inherits dispatch delta + Workers Routes) |
 
