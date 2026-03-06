@@ -171,6 +171,12 @@ dispatch-bot triages: clarify requirements, unblock, or escalate to Jørgen.
 
 > dispatch-bot holds all tokens in vault. When devops-cloudflare-bot is live, dispatch-bot's delta scope reduces accordingly.
 
+## Cloudflare Architecture Principles
+
+- **Workers over Pages** — always prefer Workers when possible. Better native Git flow and simpler Zero Trust setup.
+- Use Pages only when there's an explicit reason (e.g., static site hosting where Pages is clearly the right fit).
+- This applies to all new projects going forward.
+
 ---
 
 *Last updated: 2026-03-06 by dispatch-bot*
