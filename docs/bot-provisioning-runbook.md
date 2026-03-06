@@ -2,7 +2,7 @@
 
 Step-by-step guide for adding a new bot to the fleet — from identity creation to operational verification.
 
-**Version**: 2.2
+**Version**: 2.3
 **Last Updated**: 2026-03-05
 **Authors**: dispatch-bot (lessons learned: design-bot onboarding)
 
@@ -379,6 +379,42 @@ $SSH "sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1"  # →
 
 ---
 
+
+## Per-Bot Onboarding Decisions Checklist
+
+Before starting Phase 1, document these decisions in the Epic issue:
+
+### 1. Model Hierarchy
+Default (unless overridden):
+1. Claude Sonnet 4.6 / OAuth — daily default
+2. Claude Sonnet 4.6 / API key — OAuth fallback, notify dispatch-bot
+3. Gemini 2.5 Flash — last resort
+
+Override guidance:
+- Lightweight/triage bots → Gemini Flash as default (cost)
+- Complex reasoning bots (archi, audit) → Claude Opus as default
+
+### 2. Skillset
+Document which skills the bot needs. Minimum set for most bots:
+- `bf-memory-systems` — memory management patterns
+- `ea-core-advisor` — Continuum/fleet context literacy
+- Domain-specific skills (request via bot-fleet-continuum issue if new)
+
+### 3. Permissions Review
+Standard permissions (all bots):
+- GitHub: `repo` + `read:org` PAT
+- Gemini API: shared fleet key
+- Claude: shared OAuth token
+
+Non-standard (requires justification in Epic):
+- Cloudflare API token — only if bot deploys/manages Workers directly
+- Proxmox API — only dispatch-bot (emergency) and devops-proxmox-bot
+- 1Password — only dispatch-bot (sole secrets gateway)
+
+### 4. Telegram Bot
+- Create via @BotFather, add token to 1Password
+- Pairing procedure: `chown -R bot:bot /opt/bot/.openclaw` BEFORE first start
+
 ## Known Gotchas (lessons from design-bot onboarding)
 
 | # | Problem | Root cause | Fix |
@@ -395,6 +431,9 @@ $SSH "sudo -u bot gh issue list --repo Bot-Fleet-Inc/fleet-ops --limit 1"  # →
 | 10 | Bot has no skills | Skillset repo and install step missing from deployment | Phase 3.6 — create `skillset-<bot-name>` repo and install before starting service |
 | 11 | Workspace not backed up | git remote and backup timer not configured | Phase 3.7 — set git remote + enable `bot-backup@<bot-name>.timer` |
 | 12 | `sharp` image optimizer fails / Telegram images broken | Template 9000 uses `kvm64` (x86-64 v1) — lacks AVX/SSE4 required by sharp prebuilt binaries | Set CPU type to `host` on template 9000 and all bot VMs (Proxmox UI → Hardware → Processors) — reboot required |
+| 13 | VM disk too small — npm install fails with ENOSPC | Template disk is 2.5GB, OpenClaw + Node modules need ~3GB minimum. After clone, expand disk before installing anything | Via Proxmox API: `PUT /qemu/{vmid}/resize` with `disk=scsi0&size=+18G`, then inside VM: `apt install cloud-guest-utils -y && growpart /dev/sda 1 && resize2fs /dev/sda1` |
+| 14 | VLAN 1010 outbound blocked for new VM IPs | Firewall rule may not cover full subnet — new VM IP not reachable externally | Verify UniFi firewall rule covers full `172.16.10.0/24` subnet, not specific IPs. Check after every new VM provision |
+| 15 | Telegram pairing loops — new code every message | Two causes: (a) `openclaw.json` placed inside agentDir overrides main config; (b) `/opt/bot/.openclaw/` owned by root, service runs as `bot` user and can't write credentials | (a) Remove any `openclaw.json` from `agentDir`; (b) `chown -R bot:bot /opt/bot/.openclaw` before starting service |
 
 ---
 
