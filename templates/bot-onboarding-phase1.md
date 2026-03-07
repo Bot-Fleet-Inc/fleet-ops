@@ -20,14 +20,21 @@ dispatch-bot provisions VM and deploys autonomously after Phase 1 is complete.
 - [ ] Username: `botfleet-<short-role>`
 - [ ] Invite to `Bot-Fleet-Inc` org + `Oss-Gruppen-AS` (member)
 
-### 1.3 — Telegram bot
+### 1.3 — GitHub PAT
+- [ ] Log in to github.com as `botfleet-<short-role>`
+- [ ] Settings → Developer settings → Personal access tokens → Tokens (classic)
+- [ ] Scopes: `repo` (full), `read:org`, `workflow`
+- [ ] Expiry: 1 year
+- [ ] Send token to dispatch-bot via Telegram
+
+### 1.4 — Telegram bot
 - [ ] @BotFather → `/newbot` → name: `<Display Name> BFI`, username: `<short-role>_bfi_bot`
-- [ ] Share token with dispatch-bot via Telegram
+- [ ] Send token to dispatch-bot via Telegram
 
 ### Hand off to dispatch-bot
-After the above: tell dispatch-bot the Telegram token.
-dispatch-bot handles everything from here (VM, deployment, config, credentials).
+After all steps above: send dispatch-bot the GitHub PAT and Telegram token.
+dispatch-bot handles everything from here (VM provisioning, deployment, config, credentials).
 
 ---
-> NOT your tasks: VM provisioning, starting VM, OpenClaw config, workspace files, 1Password.
+> NOT your tasks: VM provisioning, starting VM, OpenClaw config, workspace files, 1Password storage.
 > These are all automated by dispatch-bot via Proxmox API.
