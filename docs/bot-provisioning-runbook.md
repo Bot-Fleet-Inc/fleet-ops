@@ -209,6 +209,8 @@ $SSH "curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg |
 
 ### 3.5 — Create Directory Structure + Inject Secrets
 
+> **dispatch-bot checklist**: This step is fully autonomous. Complete ALL items before proceeding to 3.6. A missing secret = a broken bot at launch.
+
 ```bash
 $SSH "mkdir -p /opt/bot/{workspace/<bot-name>,secrets,.openclaw/agents/<bot-name>/agent} && \
   useradd -m -s /bin/bash bot && \
@@ -218,21 +220,38 @@ $SSH "mkdir -p /opt/bot/{workspace/<bot-name>,secrets,.openclaw/agents/<bot-name
 # Copy workspace files
 scp -i /tmp/<bot>-id -r /tmp/<bot>-workspace/* root@172.16.10.<XX>:/opt/bot/workspace/<bot-name>/
 
-# Write secrets file
+# Write secrets file — read ALL values from 1Password, do not hardcode
 $SSH "cat > /opt/bot/secrets/<bot-name>.env << 'EOF'
-GITHUB_TOKEN=<PAT>
-ANTHROPIC_API_KEY=<shared-fleet-key>
-GEMINI_API_KEY=<bot-gemini-key>
-TELEGRAM_BOT_TOKEN=<telegram-token>
+GITHUB_TOKEN=<read from 1P: GitHub PAT field>
+ANTHROPIC_API_KEY=<read from 1P: shared fleet key>
+GEMINI_API_KEY=<read from 1P: bot Gemini key or shared>
+TELEGRAM_BOT_TOKEN=<read from 1P: Telegram token field>
+CLOUDFLARE_API_TOKEN=<read from 1P: bot CF token, if applicable>
 BOT_NAME=<bot-name>
 LOCAL_LLM_URL=http://172.16.11.10:11434
-OPENCLAW_HOOK_TOKEN=<generated-token>
+OPENCLAW_HOOK_TOKEN=<generated: openssl rand -hex 32>
+OPENCLAW_HOOKS_TOKEN=<generated: openssl rand -hex 24>
 EOF
 chmod 600 /opt/bot/secrets/<bot-name>.env"
-
-# Authenticate gh CLI
-$SSH "echo '<PAT>' | sudo -u bot gh auth login --with-token"
 ```
+
+**Verify each secret works before continuing:**
+```bash
+# GitHub PAT — must authenticate as the bot's own GitHub user
+$SSH "GITHUB_TOKEN=<PAT> gh api user --jq '.login'"
+# Expected: botfleet-<short-role>
+
+# Telegram token — verify bot is live
+curl -s "https://api.telegram.org/bot<TOKEN>/getMe" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result']['username'])"
+# Expected: <short-role>_bfi_bot
+
+# Cloudflare token (if applicable)
+curl -s "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+  -H "Authorization: Bearer <CF_TOKEN>" | python3 -c "import sys,json; print(json.load(sys.stdin)['result']['status'])"
+# Expected: active
+```
+
+Store the generated OPENCLAW_HOOK_TOKEN and OPENCLAW_HOOKS_TOKEN in 1Password (bot's vault entry) before continuing.
 
 ### 3.6 — Create Skillset Repo
 
@@ -432,6 +451,9 @@ Non-standard (requires justification in Epic):
 | 11 | Workspace not backed up | git remote and backup timer not configured | Phase 3.7 — set git remote + enable `bot-backup@<bot-name>.timer` |
 | 12 | `sharp` image optimizer fails / Telegram images broken | Template 9000 uses `kvm64` (x86-64 v1) — lacks AVX/SSE4 required by sharp prebuilt binaries | Set CPU type to `host` on template 9000 and all bot VMs (Proxmox UI → Hardware → Processors) — reboot required |
 | 13 | VM disk too small — npm install fails with ENOSPC | Template disk is 2.5GB, OpenClaw + Node modules need ~3GB minimum. After clone, expand disk before installing anything | Via Proxmox API: `PUT /qemu/{vmid}/resize` with `disk=scsi0&size=+18G`, then inside VM: `apt install cloud-guest-utils -y && growpart /dev/sda 1 && resize2fs /dev/sda1` |
+| 16 | gh CLI not installed — bot can't use GitHub tools | `gh` is not included in base Node.js setup — must be installed explicitly in Phase 3.4 | Install via GitHub's apt repo (see Phase 3.4). Verify with: `GITHUB_TOKEN=<PAT> gh api user --jq .login` |
+| 17 | Bot has GitHub PAT in env but `gh` fails silently | gh CLI installed but not in PATH for bot user, or env not loaded | Verify: `$SSH "GITHUB_TOKEN=$(grep GITHUB_TOKEN /opt/bot/secrets/<bot>.env \| cut -d= -f2) gh api user"` |
+| 18 | Config validation fails — `models.auth` unknown key | `models.auth` is not a valid schema key in OpenClaw 2026.3.x | OAuth token goes in `agents/<bot>/agent/auth-profiles.json`, NOT in openclaw.json. Use canonical template. |
 | 14 | VLAN 1010 outbound blocked for new VM IPs | Firewall rule may not cover full subnet — new VM IP not reachable externally | Verify UniFi firewall rule covers full `172.16.10.0/24` subnet, not specific IPs. Check after every new VM provision |
 | 15 | Telegram pairing loops — new code every message | Two causes: (a) `openclaw.json` placed inside agentDir overrides main config; (b) `/opt/bot/.openclaw/` owned by root, service runs as `bot` user and can't write credentials | (a) Remove any `openclaw.json` from `agentDir`; (b) `chown -R bot:bot /opt/bot/.openclaw` before starting service |
 
